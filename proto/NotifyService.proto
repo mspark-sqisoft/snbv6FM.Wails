@@ -1,0 +1,43 @@
+// 알림 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+// 전문번호	: 9001, 9002, 9004, 9005, 9007
+// 중복로그인 알림 - 9003 전문 : cancel_9003 = 1을 설정해서 사용안함
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+import "Common.proto";
+
+option go_package = "servicespb/notify";
+
+// 알림 메시지 구조체 정의
+message NotifyMessage {
+  int32 notify_svcno = 1;  // 9001, 9002, 9003, 9004, 9005, 9007
+  int32 kind = 2;          // for 9004: 0->'file list', 1->'file aprv', 2->'mail list', 3->'mail aprv', 4->'url send'
+  int32 side = 3;          // for 9004: 0->same side, 1->the other side, 2->both side
+  int32 alim = 4;          // for 9004: 0->no alim window, 1->alim window display
+  string userid = 5;       // for 9004
+  string msg = 6;          // for 9004(new notify): client display message
+  string pid = 7;          // for 9003
+  string server_no = 8;    // for 9003
+  string ipaddr = 9;       // for 9003
+  string dat = 10;          // for 9004(new notify): data (ex. link url)
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+// 알림 서비스 정의
+service NotifyService {
+  // 클라이언트 간 NOTIFY 메시지 요청[9004]
+  rpc NotifyStream (stream NotifyMessage) returns (stream NotifyMessage);
+
+  // WASM에서 bidiStream제한으로 인한 정의
+  rpc NotifyServerStream (Empty) returns (stream NotifyMessage);
+
+  // 클라이언트 간 NOTIFY 메시지 전송 - 단방향
+  rpc NotifyOnce (NotifyMessage) returns (Empty);
+}

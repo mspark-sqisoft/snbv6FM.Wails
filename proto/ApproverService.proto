@@ -1,0 +1,168 @@
+// 결재자 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+
+syntax = "proto3";
+
+package FileMoverComm;
+import "Common.proto";
+
+option go_package = "servicespb/approver";
+
+// 결재자 서비스
+service ApproverService {
+  rpc GetApproverList (ApproverListRequest) returns (ApproverHierarchyResponse);
+
+  // 대리결재자
+  rpc GetProxyApprover (ProxyApproverRequest) returns (ProxyApproverResponse);
+  rpc RegisterProxyApprover (ProxyApproverRegRequest) returns (AnswerResponse);
+  rpc DeleteProxyApprover (ProxyApproverRegRequest) returns (AnswerResponse);
+
+  // 부서 계층 조회
+  rpc GetDeptHierarchy (DeptHierarchyRequest) returns (DeptHierarchyResponse);
+  
+  // 조직정보 조회
+  rpc GetOrgInfo (OrgInfoRequest) returns (OrgInfoResponse);
+}
+
+
+//------------------------------------
+// 결재자 - 3370, 3371
+//------------------------------------
+
+// 결재자목록 조회 요청 메시지[3370]
+message ApproverListRequest {
+  string req_user_id = 1;         // 요청 ID
+  string user_id = 2;             // aprv user id for retrieve
+  string user_name = 3;           // aprv user name for retrieve using 'like'
+  string user_dept_name = 4;      // 검색조건 - 부서명
+  int32 type = 5;                 // 0:조회사용자부서관련 조회, 1: 전사용자 조회
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재자 계층 정보 메시지
+message ApproverInfo {
+  string user_id = 1;           // aprv user id for retrieve
+  string user_name = 2;         // aprv user name for retrieve
+  string user_dept_id = 3;      // dept code
+  string user_dept_name = 4;    // 부서명
+  string user_rank_code = 5;    // 직급코드
+  string user_rank = 6;         // 직급
+  string user_duty_code = 7;    // 직위코드
+  string user_duty_name = 8;    // 직위명
+  string user_mail = 9;         // 메일주소
+  int32 aprv_state = 10;        // 결재자여부 (0:일반, 1:결재자)
+  string rname = 11;            // 대리결재자명
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재자 계층정보 응답 메시지[3371]
+message ApproverHierarchyResponse {
+  int32 count = 1;                // 개수
+  repeated ApproverInfo list = 2; // 결재자 계층정보 목록
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 대리결재자 - 조회[3174, 3175], 등록[3272], 삭제[3276]
+//------------------------------------
+
+// 대리결재자 조회 요청 메시지[3174]
+message ProxyApproverRequest {
+  string userid = 1;       // 사용자 ID
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 대리결재자 조회 응답 메시지[3175]
+message ProxyApproverResponse {
+  string userid = 1;         // 사용자ID
+  string username = 2;       // 사용자이름
+  string alt_userid = 3;     // 대리결재자 ID
+  string alt_username = 4;   // 대리결재자 이름
+  string expire_from = 5;    // 대리결재시작일시(YYYYMMDD)
+  string expire_to = 6;      // 대리결재종료일시(YYYYMMDD)
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+// 대리결재자 등록 요청 메시지[3272], 대리결재자 삭제 요청 메시지[3276]
+message ProxyApproverRegRequest {
+  string userid = 1;         // 사용자ID
+  string username = 2;       // 사용자이름
+  string alt_userid = 3;     // 대리결재자 ID
+  string alt_username = 4;   // 대리결재자 이름
+  string expire_from = 5;    // 대리결재시작일시(YYYYMMDDHHMISS)
+  string expire_to = 6;      // 대리결재종료일시(YYYYMMDDHHMISS)
+  string cause = 7;          // 대리결재사유
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 부서 계층 조회 - 3250, 3251
+//------------------------------------
+
+// 부서 계층 조회 요청 메시지[3250]
+message DeptHierarchyRequest {
+  string dept_id = 1;            // 부서 아이디
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 부서 정보 메시지
+message DeptInfo {
+  string dept_id = 1;     // 부서 아이디
+  string name = 2;        // 부서 이름
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 부서 계층 응답 메시지[3251]
+message DeptHierarchyResponse {
+  int32 count = 1;               // 개수
+  repeated DeptInfo list = 2;    // 부서정보 배열
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 조직정보 조회 - 3252, 3253
+//------------------------------------
+// 조직정보 조회 요청 메시지[3252]
+message OrgInfoRequest {
+  int32 type = 1;         // 0: 사람, 1: 부서, 2: 사람&부서
+  string org_id = 2;      // 부서 아이디
+  int32 mode = 3;         // 0: id+name, 1: id+name+onoff+rname
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 조직 정보 메시지
+message OrgInfo {
+  int32 type = 1;          // 1: 부서, 0: 사람
+  int32 main_aprv = 2;     // 0: none, 1: 주결재자 여부
+  int32 on_off = 3;        // 접속 여부 - type: 1
+  string id = 4;           // 아이디
+  string name = 5;         // 이름
+  string rname = 6;        // 대결자 이름 - type: 1
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 조직정보 응답 메시지[3253]
+message OrgInfoResponse {
+  int32 count = 1;               // 개수
+  repeated OrgInfo list = 2;     // 조직도 정보
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+

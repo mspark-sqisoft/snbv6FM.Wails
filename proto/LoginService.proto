@@ -1,0 +1,134 @@
+// 로그인 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+// 전문번호	: 사전로그인[3998, 3999], 로그인[3000, 3001]
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+option go_package = "servicespb/login";
+
+// 로그인 서비스를 정의
+service LoginService {
+  rpc PreLogin (PreLoginRequest) returns (PreLoginResponse);
+  rpc Login (LoginRequest) returns (LoginResponse);
+}
+
+
+// 사전 로그인 ---------------------------
+// 사전 로그인 메시지 요청[3998]
+message PreLoginRequest {
+  string userid = 1;      // user_id or email Login Case
+  string msg = 2;         // "[START]"
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 사전 로그인 메시지 응답[3999]
+message PreLoginResponse {
+  int32 enc_mode = 1;     // 1:seed256, 2:aria256, 3:aes256, 4:seed128, 5:hight256, 6:NPAria256
+  int32 frm_size = 2;     // default 8K (8K <= frm_size <= 32M)
+  string fm_ver = 3;      // fm-server version
+  string id = 4;          // return real_ID (user_ssbr, user_id)
+  string ip = 5;          // return real_IP
+  int32 en_svc_id = 6;    // ENC_INFO - 서비스 ID
+  int32 en_svc_no = 7;    // ENC_INFO - 서비스 번호
+  int32 en_svc_port = 8;  // ENC_INFO - 서비스 포트
+  string en_site_abb = 9; // ENC_INFO - 사이트 주소
+  string en_my_ip = 10;   // ENC_INFO - 내 IP
+  string en_svc_ip = 11;  // ENC_INFO - 서비스 IP
+  bytes ctx = 12;         // ctx
+  string token = 13;      // JWT token for authentication
+  bytes session_key = 14; // 세션키
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+// 로그인 ---------------------------
+// 로그인 요청 메시지[3000]
+message LoginRequest {
+  string user_id = 1;            // 사용자 ID
+  string passwd = 2;             // 비밀번호
+  string new_passwd = 3;         // 새로운 비밀번호
+  string user_ip_in = 4;         // 내부 IP
+  string user_ip_out = 5;        // 외부 IP
+  string user_mac_in = 6;        // 내부 MAC 주소
+  string user_mac_out = 7;       // 외부 MAC 주소
+  int32 otp = 8;                 // OTP
+  int32 first_login = 9;         // 첫 로그인 여부
+  int32 init_time = 10;          // 초기화 시간
+  int32 con_date = 11;           // 연결 날짜
+  int32 con_time = 12;           // 연결 시간
+  string internet_ip = 13;       // 인터넷 IP
+  string user_name = 14;         // 사용자 이름
+  string tel_no = 15;            // 전화번호
+  string depart_code = 16;       // 부서 코드
+  string depart_name = 17;       // 부서 이름
+  string app_version = 18;       // 애플리케이션 버전
+  string in_out = 19;            // '1': 내부, '2': 외부
+  string accepted_ip = 20;       // 연결된 서버 IP
+  string sso = 21;               // SSO 로그인
+  int32 file_xfer_size = 22;     // 파일 전송 크기
+  string cancel_9003 = 23;       // 서버의 9003 취소
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 로그인 응답 메시지[3001]
+message LoginResponse {
+  string userid = 1;             // 사용자 ID
+  int32 fm_file_down = 2;        // 파일 외부->내부 전송 권한
+  int32 fm_file_up = 3;          // 파일 내부->외부 전송 권한
+  int32 fm_clip_down = 4;        // 클립보드 내부->외부 전송 권한
+  int32 fm_clip_up = 5;          // 클립보드 외부->내부 전송 권한
+  int32 fm_influp_aprv = 6;      // 파일 내부망 결재 방식
+  int32 fm_inclup_aprv = 7;      // 클립보드 내부망 결재 방식
+  int32 fm_otflup_aprv = 8;      // 파일 외부망 결재 방식
+  int32 fm_otclup_aprv = 9;      // 클립보드 외부망 결재 방식
+  int32 fm_file_speed = 10;      // 파일 최대 전송 속도
+  int32 fm_file_size = 11;       // 파일 최대 전송 크기
+  int32 fm_file_count = 12;      // 파일 최대 전송 개수
+  int32 fm_clip_speed = 13;      // 클립보드 최대 전송 속도
+  int32 fm_clip_size = 14;       // 클립보드 최대 전송 크기
+  int32 fm_login_multi = 15;     // 멀티로그인 허용 여부
+  int32 fm_sync_term = 16;       // 동기화 주기
+  int32 fm_logout_auto = 17;     // 자동 로그아웃
+  int32 fm_virus_check = 18;     // 악성코드 체크
+  string server_no = 19;         // 접속 서버 번호
+  string use_select = 20;        // user_ssbr.use_select
+  bool aprv_yn = 21;             // 결재자 여부
+  string mail_noti = 22;         // 메일 알림
+  string fm_real_ip = 23;        // 실제 IP
+  string pswd_remain_day = 24;   // 비밀번호 변경 남은 일수
+  string dummy1 = 25;            // 더미 필드 1
+  uint64 b = 26;                 // DH 알고리즘 B
+  string fm_ver = 27;            // 파일무버 버전
+  repeated string server_up = 28;// 서버 목록
+  repeated int32 login_count = 29;// 로그인 횟수
+  int32 other_server_no = 30;    // 로그인된 다른 서버 번호
+  int32 u_server_no = 31;        // 내부망 연결 서버 번호
+  int32 u_stat = 32;             // 내부망 연결 상태
+  int32 u_pid = 33;              // 내부망 연결 프로세스 PID
+  int32 a_server_no = 34;        // 외부망 연결 서버 번호
+  int32 a_stat = 35;             // 외부망 연결 상태
+  int32 a_pid = 36;              // 외부망 연결 프로세스 PID
+  string user_name = 37;         // 사용자 이름
+  string user_dept = 38;         // 부서 코드
+  string user_dept_name = 39;    // 부서명
+  string user_dept_rank = 40;    // 부서 직급
+  string user_duty_name = 41;    // 부서 직위
+  int32 file_xfer_size = 42;     // 파일 전송 크기
+  int32 multi_login_flag = 43;   // 멀티로그인 상태
+  string multi_login_ip = 44;    // 멀티로그인 IP
+  bool replace_yn = 45;          // 대리 결재자 여부
+  int32 undecided_approve = 46;  // 미결 결재 수
+  string user_dept2 = 47;        // 부서 코드 2
+  string otp_key = 48;           // OTP 키
+  int32 pswd_min_size = 49;      // 비밀번호 최소 글자수
+  int32 pswd_upper = 50;         // 비밀번호 대문자 필수 포함 여부
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}

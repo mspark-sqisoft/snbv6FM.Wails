@@ -1,0 +1,302 @@
+// 결재 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+import "Common.proto";
+
+option go_package = "servicespb/approval";
+
+// 결재 서비스를 정의
+service ApprovalService {
+  // 결재처리
+  rpc Approve (ApprovalRequest) returns (ApprovalResponse);
+  
+  // 파일 업로드 후 결재
+  rpc ApprovalAfterUpload (ApprovalAfterUploadRequest) returns (AnswerResponse);
+
+  // 파일 업로드 후 결재 - 삼성카드[3127]
+  rpc ApprovalAfterUploadSSCard (ApprovalAfterUploadSSCardRequest) returns (AnswerResponse);
+  
+  // 결재이력조회
+  rpc GetAprovalHistory (AprovalHistoryRequest) returns (AprovalHistoryResponse);
+  
+  // 결재대상목록조회
+  rpc GetAprovalList (AprovalListRequest) returns (AprovalListResponse);
+  
+  // 부서 결재이력 조회
+  rpc GetDeptHistory (DeptHistoryRequest) returns (DeptHistoryResponse);
+
+  // 결재 승인 대기 건수 조회
+  rpc GetAprvCount (AprvCountRequest) returns (AprvCountResponse);
+}
+
+
+//-------------------------------------------------------------------------------------------
+// 결재처리(승인/거부) 메시지[3092]
+message ApprovalRequest {
+  int32 seqno = 1;                 // fm_approve.seqno : unique key - 실제 사용 (서버)
+  string file_name_pc = 2;         // 확장자를 포함한 PC파일의 이름(클립보드는 CLIP)
+  string file_name_svr = 3;        // 서버에 저장한 파일명 - 실제 사용 (서버)
+  string file_user = 4;            // 파일을 등록하여 결재를 요청한 사용자 - 실제 사용 (서버)
+  int32 aprv_state = 5;            // 0:결재요청 / 1:승인 / 2:거부
+  int32 aprv_rank = 6;             // 결재 처리 순서
+  string aprv_id = 7;              // 결재권자 ID
+  string aprv_user = 8;            // 결재를 처리한 결재권자 명
+  string aprv_cause = 9;           // 결재상태에 따른 사유/근거
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재처리 결과 응답 메시지[3093]
+message ApprovalResponse {
+  int32 res = 1;                   // 1: 성공
+  int32 code = 2;                  // 클립보드 1: txt, 2: bmp
+  string reason = 3;               // 사유
+  int32 length = 4;                // 파일 길이
+  string txt = 5;                  // 텍스트
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+// 파일 업로드 후 결재 처리 메시지[4127] => NPARIA에서 패딩으로 인한 메모리 문제로 죽음
+message ApprovalAfterUploadRequest {
+  repeated string fname_svr = 1;    // 서버에 저장되는 파일이름
+  repeated string approver = 2;     // 결재자 이름
+  repeated string approver_id = 3;  // 결재자 ID
+  int32 aprv_type = 4;              // 0: 미결재 / 1: 사전승인 / 3: 사후승인 / 6: 자동자가결재
+  string aprv_dept = 5;             // 요청자 부서정보
+  string zip_pswd = 6;              // 압축파일 암호
+  string fcause = 7;                // request cause
+  int32 pkg_no = 8;
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 파일 업로드 후 결재 처리 메시지 - 삼성카드[3127]
+message ApprovalAfterUploadSSCardRequest {
+  repeated string fname_svr = 1;   // file_name_svr
+  repeated string approver = 2;    // approve user name
+  repeated string approver_id = 3; // approve user list
+  int32 pkg_no = 4;                // package number
+  int32 aprv_kind = 5;             // 0: before aprv, 1: auto aprv, 3: after aprv
+  int32 aprv_type = 6;             // 결재요청 종류
+  string aprv_dept = 7;            // 요청자 부서정보
+  string zip_pswd = 8;             // 압축파일 암호
+  repeated int32 aprv_div = 9;     // 결재 구분  1: 결재, 2: 합의, 3: 통보
+  string fcause = 10;              // request cause
+  string fcause2 = 11;             // request cause2
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+//----------------------------------------------------------------------
+
+
+// 결재/전송 이력 조회 요청 메시지[3360]
+message AprovalHistoryRequest {
+  string user_id = 1;          // 유저 아이디
+  string start_date = 2;       // 로그 시작일 : YYYY-MM-DD HH:MI:SS
+  string end_date = 3;         // 로그 종료일 : YYYY-MM-DD HH:MI:SS
+  int32 type = 4;              // 0: 승인로그, 1: 업로드로그
+  int32 start = 5;             // default 0
+  int32 count = 6;             // default 1000
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재/전송 이력 정보 메시지
+message AprvInfo {
+  // 요청자 관련 정보
+  string file_name_pc = 1;       // 확장자를 포함한 PC파일의 이름(클립보드는 CLIP)
+  string file_name_svr = 2;      // 서버에 저장한 파일명
+  string file_user = 3;          // 파일을 등록하여 결재를 요청한 사용자 ID
+  string file_user_name = 4;     // 파일을 등록하여 결재를 요청한 사용자 명
+  string file_cause = 5;         // 파일전송 요청의 목적/이유
+  string file_date = 6;          // 파일등록일자
+  uint64 file_size = 7;          // 결재 대상 파일 크기 - 단위:Bytes
+  int32 file_course = 8;         // 전송 방향 - 0:다운로드(out->in) / 1:업로드(in->out)
+
+  // 결재자 관련 정보
+  int32 aprv_state = 9;          // 0:결재요청 / 1:승인 / 2:부결
+  string aprv_user = 10;         // 결재를 처리한 결재권자 명
+  string aprv_id = 11;           // 결재권자 ID
+  string aprv_cause = 12;        // 결재/반려 상태에 따른 사유/근거
+  string aprv_date = 13;         // 결재일
+
+  // 백신처리정보
+  int32 virus_flag = 14;         // 백신검사 결과
+  int32 virus_state = 15;        // 서버 바이러스 체크 상태
+
+  // 실제 결재자 정보
+  string act_aprv_user = 16;     // 실제 결재자 명
+  string act_aprv_id = 17;       // 실제 결재자 ID
+
+  // 다운로드 일자
+  string down_date = 18;         // 파일 다운로드 일시
+
+  // 추가 : table fm_history info
+  int32 his_up = 19;             // 0 : no operation, 1 : inner up, 2 : outer up
+  int32 his_down = 20;           // 0 : no operation, 1 : inner down, 2 : outer down
+  string his_state1 = 21;        // '100'-'104':virus,'200'-'204':privacy
+  string his_state2 = 22;        // '100'-'108':prev_aprv,'200'-'208':next_aprv
+  int32 his_del = 23;            // 0 : no operation(file exist), 1 : user delete, 2 : download delete
+
+  // 예비
+  int32 aprv_type = 24;          // 2016.03.28 결재요청 종류
+  string aprv_dept = 25;         // 2016.03.28 요청자 부서
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+// 결재/전송 이력 응답 메시지[3361]
+message AprovalHistoryResponse {
+  int32 count = 1;                // record count
+  repeated AprvInfo list = 3;       // 결재/전송 이력 정보
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+//----------------------------------------------------------------------
+
+// 결재할 목록 조회 요청 메시지[3390]
+message AprovalListRequest {
+  string userid = 1;             // 결재 사용자
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재 파일 정보 메시지
+message AprvFileInfo {
+  string file_name_pc = 1;        // 확장자를 포함한 PC파일의 이름(클립보드는 CLIP)
+  string file_name_svr = 2;       // 서버에 저장한 파일명
+  uint64 file_size = 3;           // 결재 대상 파일 크기 - 단위:Bytes
+  int32 file_course = 4;          // 전송 방향 - 0:다운로드(out->in) / 1:업로드(in->out)
+  string file_user = 5;           // 파일을 등록하여 결재를 요청한 사용자 ID
+  string file_date = 6;           // 파일등록일자
+  string file_cause = 7;          // 파일전송 요청의 목적/이유
+  string aprv_user = 8;           // 결재를 처리한 결재권자 명
+  string aprv_id = 9;             // 결재권자 ID
+  int32 aprv_rank = 10;           // 결재 처리 순서
+  int32 aprv_no = 11;             // 현재 결재할 승인자 번호로 aprv_rank와 일치하면 승인할 순서임
+  int32 aprv_state = 12;          // 0:결재요청 / 1:승인 / 2:부결
+  string aprv_date = 13;          // 결재일
+  string aprv_cause = 14;         // 결재/반려 상태에 따른 사유/근거
+  string disp_date = 15;          // 유효일자:등록일로부터 7일 또는 승인일로부터 7일간 표시
+  int32 seqno = 16;               // unique key
+  uint32 server_no = 17;          // server's no of stored files 20120627
+  string priv_state = 18;         // privacy info check status
+  string dir_flag = 19;           // 0->file, 1->directory
+  string drm_flag = 20;           // drm 해지여부
+  string user_name = 21;          // 파일을 등록하여 결재를 요청한 사용자 명
+  string priv_detail = 22;        // 개인정보 검출 이력
+  string zip_pswd = 23;           // zip파일 암호
+  string user_dept_name = 24;     // 요청부서명
+  int32 priv_cnt = 25;            // 개인정보 검출 갯수
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재할 목록 응답 메시지[3391]
+message AprovalListResponse {
+  int32 m_count = 1;                // 파일 개수
+  repeated AprvFileInfo list = 2;   // 결재 목록 정보
+  repeated int32 m_pkg_no = 3;      // 패키지 번호 (2013.10.21)
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+//-------------------------------------------------------------------------------------------
+
+// 부서 결재이력 조회 요청 메시지[3262]
+message DeptHistoryRequest {
+  string dept_id = 1;          // 부서 아이디
+  string dayofstart = 2;       // 로그 시작일 : YYYY-MM-DD HH:MI:SS
+  string dayofend = 3;         // 로그 종료일 : YYYY-MM-DD HH:MI:SS
+  int32 type = 4;              // 쿼리 타입  0:all, 1:only
+  int32 limit_s = 5;           // limit start
+  int32 limit_n = 6;           // limit count
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 부서 결재 이력 정보 메시지
+message DeptHisInfo {
+  // 요청자 관련 정보
+  string file_name_pc = 1;        // 확장자를 포함한 PC파일의 이름(클립보드는 CLIP)
+  string file_name_svr = 2;       // 서버에 저장한 파일명
+  string file_user = 3;           // 파일을 등록하여 결재를 요청한 사용자 ID
+  string user_name = 4;           // 파일을 등록하여 결재를 요청한 사용자 명
+  string file_cause = 5;          // 파일전송 요청의 목적/이유
+  string file_date = 6;           // 파일등록일자
+  uint64 file_size = 7;           // 결재 대상 파일 크기 - 단위:Bytes
+  int32 file_course = 8;          // 전송 방향 - 0:다운로드(out->in) / 1:업로드(in->out)
+
+  // 결재자 관련 정보
+  int32 aprv_state = 9;           // 0:결재요청 / 1:승인 / 2:부결
+  string aprv_user = 10;          // 결재를 처리한 결재권자 명
+  string aprv_id = 11;            // 결재권자 ID
+  string aprv_cause = 12;         // 결재/반려 상태에 따른 사유/근거
+  string aprv_date = 13;          // 결재일
+
+  // 백신 처리 정보
+  int32 virus_flag = 14;          // 백신검사 결과
+  int32 virus_state = 15;         // 서버 바이러스 체크 상태
+
+  // 실제 결재자 정보
+  string act_aprv_user = 16;      // 실제 결재자 명
+  string act_aprv_id = 17;        // 실제 결재자 ID
+
+  // 다운로드 일자
+  string down_date = 18;          // 파일 다운로드 일시
+
+  // 추가 : 2014.11.06 table fm_history info
+  int32 his_up = 19;              // 0 : no operation, 1 : inner up, 2 : outer up
+  int32 his_down = 20;            // 0 : no operation, 1 : inner down, 2 : outer down
+  string his_state1 = 21;         // '100'-'104':virus,'200'-'204':privacy
+  string his_state2 = 22;         // '100'-'108':prev_aprv,'200'-'208':next_aprv
+  int32 his_del = 23;             // 0 : no operation(file exist), 1 : user delete, 2 : download delete
+
+  // 예비
+  string aprv_type = 24;          // 결재 요청 종류
+  string aprv_dept = 25;          // 요청자 부서
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 부서 결재이력 응답 메시지[3263]
+message DeptHistoryResponse {
+  int32 count = 1;                // record count
+  repeated DeptHisInfo list = 3;  // 부서 결재이력 정보
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+
+//----------------------------------------------------------------------
+// 결재 승인 대기 건수 조회 요청[3638]
+message AprvCountRequest {
+  string approver = 1; // 승인해야 하는 ID
+
+  // 경과일수 (int elapsed_days)
+  // -1인 경우 전체, 7이면 7일 이전 파일 카운트
+  int32 elapsed_days = 2;
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+}
+
+// 결재 승인 대기 건수 조회 결과[3639]
+message AprvCountResponse {
+  // Total count (int count)
+  int32 count = 1;
+
+  bytes __raw__ = 999;             // internal use, DO NOT USE
+
+}
+

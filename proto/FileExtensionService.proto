@@ -1,0 +1,104 @@
+// 파일확장자 정보 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date   	: 2025.02.18
+// 전문번호	: 파일확장자정보조회[3005, 3006], headerPattern 조회[3015, 3016], 확장자 불일치 로그 등록[3316]
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+option go_package = "servicespb/fileextension";
+
+import "Common.proto";
+
+
+// 확장자 정보 조회 서비스를 정의
+service FileExtensionService {
+  // 확장자 정보 조회
+  rpc GetExtInfo (ExtInfoRequest) returns (ExtInfoResponse);
+
+  // 파일확장자 header Pattern 조회
+  rpc GetExtPattern (ExtPatternRequest) returns (ExtPatternResponse);
+
+  // 파일 확장자 불일치 정보 등록
+  rpc SetMismatch (MismatchRegRequest) returns (AnswerResponse);
+}
+
+
+// 확장자 정보 조회 요청 메시지[3005]
+message ExtInfoRequest {
+  int32 type = 1;         // 0: 결재, 1: 결재스킵, 2: 모두
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 파일 확장자 정보 메시지
+message ExtInfo {
+  string extName = 1;     // 파일 확장자
+  int32 aFlag = 2;        // 결재 유형 (0: 결재, 1: 결재스킵)
+  int32 mode = 3;         // 결재 모드 (1: 압축파일 결재)
+  int32 course = 4;       // 전송 방향 (0: out->in, 1: in->out, 2: ALL)
+  int32 allow_upload = 5; // 전송 허가 (0: 전송 차단, 1: 전송)
+  int32 aprv_user_flag = 6; // 지정 승인자 플래그 (0: 지정 승인자 없음, 1: 지정 승인자 있음)
+  int32 aprv_type = 7;    // 해당 확장자의 결재 유형 (0: 사용 안함, 1: 사전, 2: 사후)
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 확장자 정보 응답 메시지[3006]
+message ExtInfoResponse {
+  int32 count = 1;               // 확장자 갯수
+  repeated ExtInfo list = 2;     // 확장자 정보 목록
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//----------------------------------------------------------------------------
+
+// 파일확장자 header Pattern 조회 요청 메시지[3015]
+message ExtPatternRequest {
+  string reqMsg = 1;            // ""
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 확장자 헤더 패턴 정보 메시지
+message ExtPatternInfo {
+  string extName = 1;           // 패턴 이름
+  bool hFlag = 2;               // 패턴 존재 여부
+  string extPatt = 3;           // 패턴
+  bool aFlag = 4;               // 허용/불허
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE   
+}
+
+// 파일확장자 header Pattern 응답 메시지[3016]
+message ExtPatternResponse {
+  int32 count = 1;                  // 패턴 갯수
+  repeated ExtPatternInfo list = 2; // 패턴 정보 목록
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+//----------------------------------------------------------------------------
+
+// 파일 확장자 불일치 정보 메시지
+message FileMismatchInfo {
+  string extName = 1;        // 파일 확장자 이름
+  string extPatt = 2;        // 파일 패턴
+  string fname = 3;          // 파일 이름
+  string desc1 = 4;          // 오류 메시지
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE  
+}
+
+// 파일 확장자 불일치 로그 등록 요청 메시지[3316]
+message MismatchRegRequest {
+  int32 m_count = 1;                     // 파일 개수
+  string user_id = 2;                    // 사용자 ID
+  repeated FileMismatchInfo list = 3;    // 불일치 패턴 목록
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}

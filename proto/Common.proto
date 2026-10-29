@@ -1,0 +1,27 @@
+// 공통 메시지
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+option go_package = "servicespb/common";
+
+message Empty {}
+
+// 응답 메시지 구조체 정의[3080]
+message AnswerResponse {
+  int32 res = 1;            // 1:정상
+  int32 code = 2;           // 클립보드 1:txt, 2:bmp, 3:fmh
+  string reason = 3;
+  int32 length = 4;         // 파일 길이?
+  string txt = 5;
+//  int32 trans_index = 20;   // 파일전송 응답 시에 업로드한 파일 인덱스(다중파일 전송 시 구분을 위해)
+  bytes __raw__ = 999;      // internal use, DO NOT USE
+}
+
+service TestService {
+  rpc GetTest (Empty) returns (Empty);
+}

@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0409": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "SQIsoft",
+			"FileDescription": "snB 망연계 파일전송 클라이언트",
+			"LegalCopyright": "(c) 2026, SQIsoft",
+			"ProductName": "snbApp",
+			"Comments": "Wails 판"
+		}
+	}
+}

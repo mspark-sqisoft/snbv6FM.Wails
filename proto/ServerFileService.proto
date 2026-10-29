@@ -1,0 +1,225 @@
+// 서버파일 서비스
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+
+syntax = "proto3";
+
+package FileMoverComm;
+import "Common.proto";
+
+option go_package = "servicespb/serverfile";
+
+// 서버파일목록 서비스를 정의
+service ServerFileService {
+  // 서버파일목록 조회
+  rpc GetServerFileList (ServerFileListRequest) returns (ServerFileListResponse);
+  
+  // 유해검출 상세내역 조회
+  rpc GetDetectionDetail (DetectionDetailRequest) returns (DetectionDetailResponse);
+
+  // 파일 제거
+  rpc RemoveFile (FileRemoveRequest) returns (Empty);
+
+
+  // 파일/클립보드 업로드
+  rpc FileUpload   (stream FileUploadRequest  ) returns (stream AnswerResponse);
+
+  // WASM gRPC-Web: 청크 단위 Unary 업로드 (half-duplex; 스트리밍 대신 다회 Unary)
+  rpc FileUploadWasmBegin (FileUploadWasmBeginRequest) returns (FileUploadWasmBeginResponse);
+  rpc FileUploadWasmChunk (FileUploadWasmChunkRequest) returns (AnswerResponse);
+  rpc FileUploadWasmAbort (FileUploadWasmAbortRequest) returns (AnswerResponse);
+
+  // 파일/클립보드 다운로드
+  rpc FileDownload (FileDownloadRequest) returns (stream FileDownloadResponse);
+}
+
+//------------------------------------
+// 서버파일목록 - 3310, 3311
+//------------------------------------
+
+// 서버파일목록 조회 요청 메시지[3310]
+message ServerFileListRequest {
+  string userid = 1;    // login user
+  int32 from_seq = 2;
+  int32 from_cnt = 3;
+  int32 sort = 4;       // 0: desc, 1: asc
+  int32 direction = 5;  // 0: all, 1: int, 2: ext
+  int32 down_only = 6;  // 0: none, 1: download only
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 서버파일 정보 메시지[3311]
+message FileInfo {
+  uint64 file_size = 1;         // 파일크기
+  string name_str = 2;          // 파일이름: PC
+  string aprv_name_str = 3;     // 최종승인자:또는 실 승인자
+  string expire_time = 4;       // 유효날짜
+  string aprv_time = 5;         // 승인날짜
+  string server_str = 6;        // 파일이름: SERVER
+  int32 auto_down = 7;          // 자동다운로드 여부
+  int32 drm_flag = 8;           // drm 해지여부
+  int32 state = 9;              // 승인상태
+  int32 course = 10;            // 전송방향
+  int32 virus_flag = 11;        // 바이러스 체크
+  int32 server_no = 12;         // server's no of stored files
+  int32 priv_state = 13;        // 개인정보 검출 결과
+  int32 deputy = 14;            // 대결자 여부
+  int32 dir_flag = 15;          // 파일/디렉토리 여부
+  string aprv_cause = 16;       // 결재/반려 상태에 따른 사유/근거
+  string req_cause = 17;        // 결재요청 사유
+  string down_path = 18;        // 다운로드 경로
+  int32 priv_cnt = 19;          // 개인정보 검출 개수
+  int32 pkg_no = 20;            // 패키지 번호
+  string zip_pswd = 21;         // zip 비밀번호
+  string priv_detail = 22;      // 개인정보 검출 상세내역
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 서버파일목록 응답 메시지
+message ServerFileListResponse {
+  int32 count = 1;                // count of file
+  repeated FileInfo list = 2;     // 파일 정보 목록
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 유해검출 상세내역 조회 서비스 - 3096, 3097
+//------------------------------------
+
+// 검출 상세내역 요청 메시지[3096]
+message DetectionDetailRequest {
+  string fpath = 1;        // PC file path
+  string spath = 2;        // SERVER file path
+  int32 type = 3;          // 0:개인정보, 1:APT, 2:VIRUS, 3:DRM
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 검출 상세내역 응답 메시지[3097]
+message DetectionDetailResponse {
+  string fpath = 1;                // PC file path
+  string spath = 2;                // SERVER file path
+  string detail = 3;               // fm_approve.priv_detail
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 파일 제거 - 3036
+//------------------------------------
+
+// 파일 제거 요청 메시지[3036]
+message FileRemoveRequest {
+  string fpath = 1;        // PC file path
+  string spath = 2;        // SERVER file path
+  int32 flag = 3;          // 0 : delete from window, 1 : delete after download
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//------------------------------------
+// 파일/클립보드 다운로드 - 파일[3330, 3331], 클립보드[3050, 3051]
+//------------------------------------
+
+// FileDownloadStartRequest 요청 메시지[3330, 3050]
+message FileDownloadStartRequest {
+  string fpath = 1;               // PC 파일 경로
+  string spath = 2;               // 서버 파일 경로
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//#######################################################################
+// FileUpload 요청
+message FileTransInfo {
+  uint64 fsize = 1;                        // PC file size
+  string fpath = 2;                        // PC file path
+  repeated string approver_id = 3;         // 결재자ID list
+  int32 pkg_no = 4;                        // package approve mm*100000 + ss*1000 + mili
+  int32 aprv_kind = 5;                     // 0: before aprv, 1: auto aprv, 3: after aprv
+  int32 extskip = 6;                       // 1: SKIP CHECK EXT, 0: CHECK EXT
+  int32 dir_flag = 7;                      // 0: file, 1: directory
+  int32 enc_mode = 8;                      // 1: aes-256, 0: seed-256
+  int32 autodown = 9;                      // 자동 다운로드 여부 0:x , 1:o
+  int32 aprv_type = 10;                    // 결재 요청 종류(0:미결재 / 1:사전승인 / 3:사후승인 / 6:자동자가결재)
+  string aprv_dept = 11;                   // 요청자 부서 정보
+  string zip_pswd = 12;                    // 압축 파일 암호
+  repeated int32 aprv_div = 13;            // 결재 구분  1: 결재, 2: 합의, 3: 통보
+  bool isNew = 14;                         // 0: old version 1: new version
+  string fcause = 15;                      // upload cause
+  string down_path = 16;                   // download path
+  string checksum = 17;                    // crc check sum
+  int32 drm_flag = 18;                     // drm_flag
+  string resv = 19;                        // 0:old version 1:new version
+//  int32 trans_index = 20;                // 전송 인덱스(다중파일 전송 시 구분을 위해)
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+message FileUploadRequest {
+  oneof data {
+    FileTransInfo info  = 1;
+    bytes chunk         = 2;
+  }
+
+  bytes __raw__         = 999;     // internal use, DO NOT USE
+}
+
+
+//------------------------------------------------------------------
+// WASM Unary 업로드 — 세션 시작 (메타데이터는 FileTransInfo와 동일 정책)
+message FileUploadWasmBeginRequest {
+  FileTransInfo info = 1;
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+message FileUploadWasmBeginResponse {
+  string upload_id = 1;           // 이후 Chunk/Abort에 전달
+  AnswerResponse answer = 2;      // res!=1 이면 upload_id 무시
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// WASM Unary 업로드 — 청크 (0부터 순차; is_last 에서 최종 검증·처리)
+message FileUploadWasmChunkRequest {
+  string upload_id = 1;
+  uint64 chunk_index = 2;         // 0부터 순차 증가
+  bytes chunk = 3;
+  bool is_last = 4;
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+message FileUploadWasmAbortRequest {
+  string upload_id = 1;
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//------------------------------------------------------------------
+// FileDownloadRequest
+message FileDownloadRequest {
+  string fpath = 1;        // PC 파일 경로
+  string spath = 2;        // 서버 파일 경로
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// FileDownloadResponse 수신 메시지(파일, 클립보드)
+message FileDownloadResponse {
+  oneof data {
+    AnswerResponse answer = 1;
+    bytes          chunk  = 2;
+  }
+  bytes __raw__           = 999;     // internal use, DO NOT USE
+}
+
+
+

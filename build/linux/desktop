@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=snbApp
+Comment=snB 망연계 파일전송 클라이언트
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/snbApp %u
+Terminal=false
+Type=Application
+Icon=snbApp
+Categories=Utility;
+StartupWMClass=snbApp
+
+ 

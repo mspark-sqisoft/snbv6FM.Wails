@@ -1,0 +1,212 @@
+// 공통 서비스 정의
+//------------------------------------
+// Author 	: 박동환
+// Date	  	: 2025.02.18
+
+syntax = "proto3";
+
+package FileMoverComm;
+
+option go_package = "servicespb/commonservice";
+
+import "Common.proto";
+
+// 공통 서비스
+service CommonService {
+  // 프로그램 모듈 업데이트
+  rpc Update (UpdateRequest) returns (stream UpdateResponse);
+
+  // 도메인 정책 조회
+  rpc GetDomainPolicy (DomainPolicyRequest) returns (DomainPolicyResponse);
+
+  // 무결성 체크
+  rpc CheckIntegrity (IntegrityRequest) returns (IntegrityResponse);
+
+  // 비밀번호 변경
+  rpc ChangePassword (ChangePasswordRequest) returns (AnswerResponse);
+
+  // Profile2 정보 조회
+  rpc GetProfile (ProfileRequest) returns (ProfileResponse);
+
+  // LinkRedirect URL 전송
+  rpc SendURL (URLInfo) returns (AnswerResponse);
+  rpc RecvURL (Empty) returns (stream URLInfo);	// notify로 받음
+
+  // URL 필터 조회
+  rpc GetUrlFilter (UrlFilterRequest) returns (UrlFilterResponse);
+}
+
+
+// // 비밀번호 변경 응답 메시지 구조체 정의[3080]
+// message ChangePasswordResponse {
+//   int32 res = 1;            // 1:정상
+//   int32 code = 2;
+//   string reason = 3;
+//   int32 length = 4;         // 파일 길이
+//   string txt = 5;
+
+//   bytes __raw__ = 999;     // internal use, DO NOT USE
+// }
+
+//------------------------------------
+// 업데이트 - 3031, 3032
+//------------------------------------
+
+// 업데이트 요청 메시지[3032]
+message UpdateRequest {
+  string fpath = 1;       // PC file path
+  string spath = 2;       // SERVER file path
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 파일 업데이트 수신 메시지[3031]
+message UpdateResponse {
+  oneof data {
+    int32 size = 1;
+    bytes chunk = 2;
+  }
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 도메인 정책 - 3230, 3231
+//------------------------------------
+
+// 도메인 정책 요청 메시지[3230]
+message DomainPolicyRequest {
+  string userid = 1;       // 사용자 ID
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+// 도메인 정보 메시지
+message DomainInfo {
+  string profile_name = 1;   // 프로파일명
+  string domain_name = 2;    // 도메인 명
+  string domain_ip = 3;      // 도메일 IP
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+// 도메인 정책 응답 메시지[3231]
+message DomainPolicyResponse {
+  int32 count = 1;              // 도메인 정보 개수
+  repeated DomainInfo list = 2; // 도메인 정보 목록
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+//------------------------------------
+// 무결성 체크 - 3510, 3511
+//------------------------------------
+
+// 파일 checksum 정보 메시지
+message FileChecksumInfo {
+  string type_div = 1;         // division (NBS/SBM/FM)
+  string version = 2;          // version (V3.x.x.x)
+  string fname = 3;            // file name
+  uint64 fsize = 4;            // file size
+  bytes hash = 5;              // hash value
+  int32 location = 6;          // 1: int-fm, 0: ext-fm
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 무결성 체크 요청 메시지[3510]
+message IntegrityRequest {
+  repeated FileChecksumInfo list = 1;  // File Checksum Info Array
+  int32 tot_cnt = 2;                   // total info count
+  int32 chk_div = 3;                   // 0: start, 1: periodically, 2: manual
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 파일 checksum 결과 정보 메시지
+message FileChecksumResult {
+  string fname = 1;            // file name
+  string detail = 2;           // result detail
+  int32 result = 3;            // checksum result (0: unknown, 1: success, 2: mismatched size, 3: mismatched hash, 4: mismatched all)
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// 무결성 체크 응답 메시지[3511]
+message IntegrityResponse {
+  repeated FileChecksumResult list = 1;    // result array
+  int32 tot_cnt = 2;                       // total count
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//------------------------------------
+// 비밀번호 변경 - 3002
+//------------------------------------
+
+// 비밀번호 변경 요청 메시지[3002]
+message ChangePasswordRequest {
+  string userId = 1;       // 사용자 ID
+  string curPw = 2;        // 현재 비밀번호
+  string newPw = 3;        // 새로운 비밀번호
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//------------------------------------
+// Profile2 정보 조회 서비스 - 3007, 3008
+//------------------------------------
+
+// Profile2 정보 조회 요청 메시지[3007]
+message ProfileRequest {
+  string userid = 1;         // login user
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// Profile2 정보 응답 메시지[3008]
+message ProfileResponse {
+  string profile = 1;        // profile list 예) 'file_save_days=1,pw_error_cnt=3,pw_term=90'
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+//------------------------------------
+// LinkRedirect - URL정보[3204], URL필터목록[3094, 3095]
+//------------------------------------
+
+// URL 전송정보 메시지[3204]
+message URLInfo {
+  string url = 1;         // URL
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+
+// URL 필터 요청 메시지[3094]
+message UrlFilterRequest {
+  int32 code = 1;         // 0: filemover, 1: proxy.pac ... 항상 0
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// URL 필터 정보 메시지
+message UrlFilterInfo {
+  int32 code = 1;         // code info
+  int32 flag = 2;         // allow flag
+  string name = 3;        // filter name
+  string url = 4;         // url text
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
+
+// URL 필터 응답 메시지[3095]
+message UrlFilterResponse {
+  int32 count = 1;                       // total count
+  repeated UrlFilterInfo list = 2;       // filter list
+
+  bytes __raw__ = 999;     // internal use, DO NOT USE
+}
