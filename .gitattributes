@@ -1,0 +1,2 @@
+# 저장소와 작업트리 모두 LF 로 둔다(core.autocrlf 설정과 무관하게). 이진 파일은 git 이 알아서 거른다.
+* text=auto eol=lf
