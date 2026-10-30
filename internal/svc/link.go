@@ -162,7 +162,7 @@ func (l *LinkService) sendURL(s *nbs.Session, web string) {
 	err := link.SendURL(s, web)
 	switch {
 	case errors.Is(err, link.ErrMalware):
-		l.c.Emit(EvDialog, Dialog{ID: l.c.dialogSeq.Add(1), Title: "요청 처리 오류", Text: err.Error()})
+		l.c.dialog("요청 처리 오류", err.Error(), "")
 	case err != nil:
 		l.log().Warn("LinkRedirect URL 전송[3204] 실패!!!", "err", err)
 	}
@@ -310,7 +310,7 @@ func (l *LinkService) domainOn() bool {
 func (l *LinkService) hostsFailed(text string, err error) {
 	l.log().Warn(text, "err", err)
 	if l.hostsWarned.CompareAndSwap(false, true) {
-		l.c.Emit(EvDialog, Dialog{ID: l.c.dialogSeq.Add(1), Title: "정보", Text: text})
+		l.c.dialog("정보", text, "")
 	}
 }
 

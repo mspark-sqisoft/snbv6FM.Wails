@@ -85,7 +85,7 @@ var (
 	cssURLRe    = regexp.MustCompile(`(?i)url\(\s*("[^"]*"|'[^']*'|[^)]*?)\s*\)`)
 	refWSRe     = regexp.MustCompile(`[\t\n\r]`)
 	controlsRe  = regexp.MustCompile(`[\x00-\x20]`)
-	driveURLRe  = regexp.MustCompile(`^/[A-Za-z]:`)
+	driveURLRe  = regexp.MustCompile(`^/[A-Za-z]:[/\\]`)
 )
 
 // DecodeEntities 는 HTML 문자 참조를 푼다. 붙여 넣는 프로그램은 &#92;&#92;host 를 \\host 로 읽으므로 판정은 푼 값으로 한다.
@@ -239,17 +239,20 @@ func refValue(raw string) string {
 	return strings.TrimSpace(refWSRe.ReplaceAllString(DecodeEntities(raw), ""))
 }
 
-// fileURLPath 는 호스트 없는 file: 주소의 경로다. 호스트가 있으면 거짓.
+// fileURLPath 는 호스트 없는 file: 주소가 가리키는 이 PC 의 보통 경로다. 호스트가 있거나 보통 경로가 아니면 거짓.
+// Windows 는 UNC·장치·NT 앞머리를 하나씩 막지 않고 드라이브 경로만 남긴다(원본 plainFilePath) ― file:///%5Chost%5Cs 는 url 이 %5C 를 풀고
+// path.Clean 이 \ 를 건드리지 않아 그대로 두면 os.Open 이 UNC 로 연다. 정리하기 전과 뒤를 모두 판정한다 ― 정리가 file:///C:/../%5C%5Chost 의
+// 드라이브를 지운다.
 func fileURLPath(v string) (string, bool) {
 	u, err := url.Parse(v)
 	if err != nil || u.Host != "" {
 		return "", false
 	}
-	p := u.Path
-	if driveURLRe.MatchString(p) {
-		p = p[1:]
+	clean := path.Clean(u.Path)
+	if driveURLRe.MatchString(u.Path) && driveURLRe.MatchString(clean) {
+		return clean[1:], true
 	}
-	return p, true
+	return clean, runtime.GOOS != "windows" && strings.HasPrefix(u.Path, "/")
 }
 
 // ClassifyRef 는 보내는 쪽 그림 참조 하나를 나눈다. domain 은 복사한 페이지 주소(SourceURL).

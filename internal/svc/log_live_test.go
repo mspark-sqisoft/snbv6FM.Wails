@@ -136,6 +136,7 @@ func TestLiveNotifyFlow(t *testing.T) {
 	s2 := login()
 	time.Sleep(500 * time.Millisecond)
 	t.Setenv("SNB_TEST_HOOKS", "1")
+	t.Setenv("SNB_DEV", "1")
 	if err := l.InjectNotify(notify.SvcEvent, notify.KindDupFM, notify.SideSame, s2.UserID, "", ""); err != nil {
 		t.Fatal(err)
 	}

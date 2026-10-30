@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -218,6 +219,25 @@ func TestClassifyRemote(t *testing.T) {
 		} else if r.Kind != RefRemote || r.URL.String() != c.url {
 			t.Errorf("%s: %+v", c.value, r)
 		}
+	}
+}
+
+// 퍼센트 인코딩한 \ 로 적은 UNC·장치 경로와 드라이브 상대 경로는 여는 쪽(os.Open)까지 가지 않는다.
+func TestClassifyFileDriveOnly(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows 전용")
+	}
+	for _, v := range []string{
+		"file:///%5Chost%5Cs%5Cx.png", "file:///%2F%5Chost%5Cs%5Cx.png", "file:///%5C.%5Cpipe%5Cx", "file:///%5C.%5CUNC%5Chost%5Cs%5Cx.png",
+		"file:///%5C%3F%5CUNC%5Chost%5Cs%5Cx.png", "file:///C:x.png", "file:////host/s/x.png", "file:///x.png", "file:C:/x.png",
+		"file:///C:/../%5C%5Chost%5Cs%5Cx.png", "file:///C:/a/../../%5C%5Chost%5Cs%5Cx.png", "file:///C:/../x.png",
+	} {
+		if r := ClassifyRef(v, "", kRoot); r.Kind != RefDrop {
+			t.Errorf("%s: 막혀야 한다 %+v", v, r)
+		}
+	}
+	if r := ClassifyRef("file:///C:%5Cw%5Ca.png", "", kRoot); r.Kind != RefLocal {
+		t.Errorf("드라이브 경로는 열어야 한다 %+v", r)
 	}
 }
 

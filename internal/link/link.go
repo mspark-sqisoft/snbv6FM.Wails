@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,24 @@ const Port = 29000
 
 const bodyLimit = 64 << 10
 
+// extensionSchemes 는 브라우저 확장이 보내는 Origin 의 스킴이다. 확장 ID 는 고정되어 있지 않아(manifest.json 에 key 가 없다) 스킴까지만 본다.
+var extensionSchemes = []string{"chrome-extension", "moz-extension", "safari-web-extension"}
+
+// trusted 는 요청이 브라우저 확장이나 이 PC 의 프로그램에서 왔는가다. 창구로 온 주소는 서버로 나가므로 웹 페이지가 부르면 안 된다 ―
+// 페이지의 POST 는 Origin 에 페이지 주소가 붙고, DNS rebinding 은 Host 에 공격자의 이름이 남는다.
+func trusted(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.Host)
+	if err != nil || !(strings.EqualFold(host, "localhost") || host == "127.0.0.1" || host == "::1") {
+		return false
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	scheme, _, ok := strings.Cut(origin, "://")
+	return ok && slices.Contains(extensionSchemes, strings.ToLower(scheme))
+}
+
 // Server 는 루프백 두 소켓의 HTTP 창구다.
 type Server struct {
 	srv *http.Server
@@ -37,7 +56,12 @@ type Server struct {
 func Start(log *slog.Logger, port int, handle func(body string) bool) (*Server, error) {
 	log = log.With("category", applog.CatApp)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /{$}", func(w http.ResponseWriter, r *http.Request) {
+		if !trusted(r) {
+			log.Warn("LinkRedirect httpServer 출처를 믿을 수 없는 요청 거부:", "origin", r.Header.Get("Origin"), "host", r.Host)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, bodyLimit))
 		if err != nil {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -50,7 +49,6 @@ type Core struct {
 	onLogout  []func()
 	onSecond  []func(application.SecondInstanceData)
 	integStop chan struct{} // 무결성 주기 검사 고루틴을 멈춘다
-	dialogSeq atomic.Int64
 }
 
 // Dialog.OnClose 값 ― 확인 창을 닫은 뒤 화면이 할 일.
@@ -307,7 +305,7 @@ func (c *Core) LogoutNotice(reason, title, text, onClose string) bool {
 		return false
 	}
 	c.Logout(reason) // EvSessionEnded 가 먼저 가서 화면이 열린 창을 닫은 뒤 이 창이 뜬다
-	c.Emit(EvDialog, Dialog{ID: c.dialogSeq.Add(1), Title: title, Text: text, OnClose: onClose})
+	c.dialog(title, text, onClose)
 	return true
 }
 

@@ -394,7 +394,7 @@ type AppService struct {
 - 일반 창은 하나뿐이고 새 요청이 오면 제목·본문을 덮어쓴다. 닫힘 콜백도 하나뿐(`m_messageBoxCallback`), 닫힐 때 한 번 부르고 지운다(`ViewController.cpp:150-170`).
 - 단추는 [확인] 하나. 본문에 `objectName: messageDialogText`(E2E 손잡이). 본문·제목은 `Text.PlainText`.
 - **"닫으면 종료" 안내의 보호**: 로그인 상태에서 로그인 화면으로 돌아갈 때 `closeSessionPopups()` 가 열린 팝업을 모두 닫고 콜백을 버린다. 단 중복 로그인 종료 안내(9004 kind 6·7)가 떠 있는 동안 연결이 끊겨 이 정리가 돌면, 콜백 대신 `m_exitWhenNoticeClosed` 를 보고 곧바로 종료한다(`ViewController.cpp:2858-2866`).
-- Wails 구현: 화면(Svelte) 쪽에 창 큐 하나. Go 는 `Event.Emit("dialog", {id, title, text, onClose})` 로 보내고 `onClose` 는 `"exit"`·`"logoutProcess"`·`""` 같은 동작 이름(콜백 함수 대신). 화면이 닫히면 `DialogClosed(id)` 를 불러 Go 가 동작을 실행. 큐에 "exit" 가 있으면 큐를 비우는 정리에서도 지킨다.
+- Wails 구현: 화면(Svelte) 쪽에 창 큐 하나. Go 는 `Emit(EvDialog, Dialog{Title, Text, OnClose})` 로 보내고 `OnClose` 는 `"exit"`·`"logoutProcess"`·`""` 같은 동작 이름(콜백 함수 대신). 창이 닫히면 화면(`App.svelte` 의 `goDialog`)이 그 동작을 직접 실행한다. 큐에 "exit" 가 있으면 큐를 비우는 정리에서도 지킨다.
 
 ### 5.5 알림 띠 (`controls/CustomInfoBar.qml`, `settings/Notify.qml`, `Main.qml:134-141`)
 
@@ -686,7 +686,7 @@ for f in dated:
 
 원본: IPC `mode=notify` 로 `{"svcno":9007,"kind":0,"msg":"…","dat":"…","server":N}` 을 받아 `receivedNotify` 에 넣는다. 개발 빌드이면서 `SNB_TEST_HOOKS=1` 일 때만(`ViewController.cpp` `handleIpcMessage`). 아니면 `[시험진입점] notify >>> 개발 빌드가 아니라 무시합니다.`
 
-Wails: 개발 빌드 태그일 때만 컴파일되는 바인딩 `TestInjectNotify(server int, svcno, kind, side int32, userid, msg, dat string)` 또는 로컬 파이프. 실서버가 9007 을 못 보내므로 이것 없이는 공지 처리를 시험할 길이 없다(9절).
+Wails: 바인딩 `LogService.InjectNotify(svcno, kind, side int32, userid, msg, dat string)`. 원본과 같이 개발 빌드(`config.IsDev`)이면서 `SNB_TEST_HOOKS=1` 일 때만 받고, 아니면 `[시험진입점] notify >>> 개발 빌드의 SNB_TEST_HOOKS 가 없어 무시합니다.` 를 남긴다. 실서버가 9007 을 못 보내므로 이것 없이는 공지 처리를 시험할 길이 없다(9절).
 
 ### 7.5 화면 글자 서식
 

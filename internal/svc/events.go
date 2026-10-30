@@ -64,7 +64,6 @@ type Notice struct {
 
 // Dialog 는 EvDialog 의 값이다. OnClose 는 닫힌 뒤 할 일의 이름("" · "exit" · "logoutProcess")이다(docs/port/09 5.4).
 type Dialog struct {
-	ID      int64  `json:"id"`
 	Title   string `json:"title"` // 비면 "정보"
 	Text    string `json:"text"`  // 평문(서식 해석 안 함)
 	OnClose string `json:"onClose"`

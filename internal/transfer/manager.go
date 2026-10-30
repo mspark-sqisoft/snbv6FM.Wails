@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -107,6 +108,9 @@ type Tick struct {
 
 var stateNames = [...]string{"", "pending", "active", "done", "failed", "cancelled"}
 
+// maxFinished 는 목록에 남기는 끝난 행 수다. 자동 전송은 [목록 지우기] 없이 며칠씩 돌고, 목록은 바뀔 때마다 통째로 화면에 간다.
+const maxFinished = 1000
+
 type run struct {
 	id       int64
 	job      Job
@@ -131,6 +135,7 @@ func (r *run) prepare() {
 		if r.job.Prepare != nil {
 			r.prepErr = r.job.Prepare(r.ctx, &r.prog)
 		}
+		r.job.Prepare = nil
 	})
 }
 
@@ -141,6 +146,7 @@ type Manager struct {
 	seq   int64
 	runs  map[int64]*run
 	order []int64
+	ended []int64 // 끝난 행(끝난 순서)
 	dirty bool
 	prep  chan struct{}
 	h     Hooks
@@ -189,6 +195,7 @@ func (m *Manager) Add(j Job) (int64, error) {
 				defer func() { <-m.prep }()
 				r.prepare()
 			case <-ctx.Done():
+				r.prepOnce.Do(func() { r.job.Prepare = nil })
 			}
 		}()
 	}
@@ -236,12 +243,34 @@ func (m *Manager) finish(r *run, err error) {
 	r.state, r.err, r.ended = st, err, time.Now()
 	r.cancel()
 	m.dirty = true
+	done := r.release()
+	m.retireLocked(r.id)
 	m.pumpLocked()
 	res := Result{ID: r.id, State: st, Err: err, Elapsed: r.ended.Sub(r.started), Bytes: r.prog.done.Load()}
 	m.mu.Unlock()
-	if r.job.Done != nil {
-		r.job.Done(res)
+	if done != nil {
+		done(res)
 	}
+}
+
+// release 는 끝난 행이 쥔 함수를 놓고 Done 을 돌려준다 ― 행은 목록에 오래 남고, 함수는 세션을 쥐고 있다.
+func (r *run) release() func(Result) {
+	done := r.job.Done
+	r.job.Run, r.job.Done = nil, nil
+	return done
+}
+
+// retireLocked 는 끝난 행을 적어 두고, 끝난 행이 maxFinished 를 넘으면 가장 먼저 끝난 것을 지운다.
+func (m *Manager) retireLocked(id int64) {
+	m.ended = append(m.ended, id)
+	if len(m.ended) <= maxFinished {
+		return
+	}
+	old := m.ended[0]
+	m.ended = m.ended[1:]
+	delete(m.runs, old)
+	m.q.Forget(old)
+	m.order = slices.DeleteFunc(m.order, func(x int64) bool { return x == old })
 }
 
 // cancelLocked 는 대기 중이면 곧바로 끝내고(Done 을 돌려준다), 진행 중이면 ctx 를 끊어 워커가 끝내게 한다.
@@ -253,8 +282,9 @@ func (m *Manager) cancelLocked(r *run, why error) func() {
 		r.state, r.err, r.ended = Cancelled, why, time.Now()
 		r.cancel()
 		m.dirty = true
-		if r.job.Done != nil {
-			return func() { r.job.Done(Result{ID: r.id, State: Cancelled, Err: why}) }
+		m.retireLocked(r.id)
+		if done := r.release(); done != nil {
+			return func() { done(Result{ID: r.id, State: Cancelled, Err: why}) }
 		}
 		return nil
 	}
@@ -319,11 +349,12 @@ func (m *Manager) Clear() {
 	for _, id := range m.order {
 		if m.runs[id].state.terminal() {
 			delete(m.runs, id)
+			m.q.Forget(id)
 		} else {
 			keep = append(keep, id)
 		}
 	}
-	m.order = keep
+	m.order, m.ended = keep, nil
 	m.dirty = true
 }
 

@@ -155,6 +155,48 @@ func TestServer(t *testing.T) {
 		t.Fatalf("본문 상한: %d", c)
 	}
 
+	// 확장·로컬 프로그램만 받는다. 웹 페이지(Origin), DNS rebinding(Host), 메서드 없는 GET(img 태그)은 판정까지 가지 않는다
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	cases := []struct {
+		method, host, origin string
+		want                 int
+	}{
+		{"POST", addr, "chrome-extension://abcdef", 205},
+		{"POST", addr, "moz-extension://1234", 205},
+		{"POST", fmt.Sprintf("localhost:%d", port), "", 205},
+		{"POST", fmt.Sprintf("[::1]:%d", port), "", 205},
+		{"POST", addr, "https://evil.example", 403},
+		{"POST", addr, "http://127.0.0.1:8080", 403},
+		{"POST", addr, "null", 403},
+		{"POST", fmt.Sprintf("evil.example:%d", port), "", 403},
+		{"POST", "evil.example", "chrome-extension://abcdef", 403},
+		{"GET", addr, "", 404},
+		{"OPTIONS", addr, "https://evil.example", 404},
+	}
+	for _, c := range cases {
+		req, err := http.NewRequest(c.method, "http://"+addr+"/", strings.NewReader("send"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Host = c.host
+		if c.origin != "" {
+			req.Header.Set("Origin", c.origin)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != c.want {
+			t.Errorf("%+v: %d", c, res.StatusCode)
+		}
+		if c.want == 205 {
+			<-got
+		} else if len(got) != 0 {
+			t.Fatalf("%+v: 판정까지 갔다", c)
+		}
+	}
+
 	// 포트가 점유되면 실패를 돌려준다(원본 시험과 같다)
 	if s2, err := Start(log, port, func(string) bool { return true }); err == nil {
 		s2.Close()

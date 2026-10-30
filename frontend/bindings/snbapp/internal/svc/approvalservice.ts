@@ -41,8 +41,9 @@ export function DeleteProxy(): $CancellablePromise<void> {
 /**
  * DownloadForApproval 은 결재 대상을 받는다(내용 확인용). 받은 뒤 서버 파일을 지우지 않는다(APR-061).
  * 클립보드는 폴더를 묻지 않고 임시 폴더로 받아 결재자 클립보드에 넣고(붙여넣기 흉내 없음, Saved 에 없다), 파일은 폴더를 고른 뒤 받는다.
- * 폴더(서버에 zip)는 zip 그대로 둔다. 겹쳐 부르면 Busy.
- * 받기는 전송 대기열(서랍에 보인다)로 돌리고 모두 끝날 때까지 기다린다. 받은 압축·폴더 zip 은 내부 목록 창을 띄운다(APR-063).
+ * 폴더(서버에 zip)는 일반 받기처럼 풀어서 폴더로 둔다(원본 FileTransfer.cpp `Recv Directory Extract!`). 같은 이름이 있으면 파일 중복 확인 창으로 묻는다.
+ * 겹쳐 부르면 Busy ― 받은 것의 내부 목록을 훑는 동안까지다(창이 뜬 뒤에는 풀린다).
+ * 받기는 전송 대기열(서랍에 보인다)로 돌리고 모두 끝날 때까지 기다린다. 받은 압축·폴더는 내부 목록 창을 띄운다(APR-063).
  */
 export function DownloadForApproval(items: $models.ApprovalItem[] | null): $CancellablePromise<$models.ApprovalDownload | null> {
     return $Call.ByID(2846062072, items);

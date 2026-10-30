@@ -148,6 +148,13 @@ func (q *Queue) Cancel(id int64) bool {
 	return true
 }
 
+// Forget 은 끝난 번호를 지운다(Manager 가 행을 지울 때).
+func (q *Queue) Forget(id int64) {
+	if e, ok := q.ents[id]; ok && e.state.terminal() {
+		delete(q.ents, id)
+	}
+}
+
 // State 는 그 번호의 상태다. 모르면 Unknown.
 func (q *Queue) State(id int64) State {
 	if e, ok := q.ents[id]; ok {

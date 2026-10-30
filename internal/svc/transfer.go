@@ -71,6 +71,9 @@ type ConflictAsk struct {
 // ErrUploadBusy 는 사람이 답을 기다리는 업로드(검사·결재자 창)가 있어 새 업로드를 받지 않을 때다.
 var ErrUploadBusy = approval.ErrBusy
 
+// ErrDownloadBusy 는 받기 요청 줄이 차서 새 요청을 받지 않을 때다.
+var ErrDownloadBusy = errors.New("앞 다운로드 요청을 처리한 뒤 다시 시도하세요.")
+
 // TransferService 는 업로드·다운로드 단추, 전송 상태 서랍, 파일 중복 확인 창이 부른다.
 type TransferService struct {
 	base
@@ -542,7 +545,7 @@ func (t *Transfers) pickFailed(err error, auto bool) {
 	case auto:
 		log.Info("[Auto]결재자 정하기 실패", "err", err)
 	case errors.Is(err, approval.ErrNoApprover):
-		t.c.Emit(EvDialog, Dialog{ID: t.c.dialogSeq.Add(1), Title: "정보", Text: err.Error()})
+		t.c.dialog("정보", err.Error(), "")
 	default:
 		log.Warn("결재자 정하기 실패", "err", err)
 		t.c.Emit(EvNotice, Notice{Severity: SevWarning, Text: err.Error()})
@@ -743,7 +746,8 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 		sctx, cancel := transfer.SessionCtx(ctx, s)
 		defer cancel()
 		spec := transfer.UploadSpec{Path: sendPath, Info: info, Stall: time.Duration(t.envInt("UPLOAD_STALL_SEC", 30)) * time.Second,
-			Limit: files.SizeText(uint64(s.Info.GetFmFileSize()) * 1024)}
+			Commit: time.Duration(t.envInt("UPLOAD_COMMIT_SEC", 3600)) * time.Second, // 기본값은 서버의 스트림 상한 FM_STREAM_TIMEOUT(60분)이다
+			Limit:  files.SizeText(uint64(s.Info.GetFmFileSize()) * 1024)}
 		if !isDir {
 			spec.Stamp = r.stamp
 		}
@@ -755,7 +759,9 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 	}
 	done := func(res transfer.Result) {
 		cleanup()
-		t.unmarkAuto(r)
+		if !errors.Is(res.Err, transfer.ErrCommitLimit) { // 서버에 올라갔을 수 있다 ― 표시를 남겨 자동 업로드가 다시 올리지 않게 한다(다시 로그인하면 풀린다)
+			t.unmarkAuto(r)
+		}
 		switch {
 		case res.Err == nil:
 			log.Info(fmt.Sprintf("파일업로드 성공 >>> transIndex[%d] labTime[%dms] %s - %s", res.ID, res.Elapsed.Milliseconds(), name, speedText(res)))
@@ -872,7 +878,7 @@ func (t *Transfers) reportFail(name string, err error) {
 		if len(list) > 20 {
 			list = append(list[:20], fmt.Sprintf("… 외 %d건", len(list)-20))
 		}
-		t.c.Emit(EvDialog, Dialog{ID: t.c.dialogSeq.Add(1), Title: titleTransferFail, Text: strings.Join(list, "\n")})
+		t.c.dialog(titleTransferFail, strings.Join(list, "\n"), "")
 	})
 }
 
@@ -930,7 +936,7 @@ func (t *Transfers) DownloadTo(serverNames []string, dir string) error {
 	case len(blocked) == 1 && len(ok) == 0:
 		t.c.Emit(EvNotice, Notice{Severity: SevWarning, Text: blocked[0]})
 	case len(blocked) > 0:
-		t.c.Emit(EvDialog, Dialog{ID: t.c.dialogSeq.Add(1), Title: "정보", Text: strings.Join(blocked, "\n")})
+		t.c.dialog("정보", strings.Join(blocked, "\n"), "")
 	}
 	if len(ok) == 0 {
 		return nil
@@ -938,7 +944,7 @@ func (t *Transfers) DownloadTo(serverNames []string, dir string) error {
 	select {
 	case t.reqs <- downloadReq{s: s, gen: t.c.Gen(), list: ok, dir: dir}:
 	default:
-		return ErrUploadBusy
+		return ErrDownloadBusy
 	}
 	return nil
 }
@@ -1308,7 +1314,7 @@ func (t *Transfers) AutoUploadOnce() {
 	done := filepath.Join(dir, transfer.DoneDir)
 	if !files.Exists(done) { // 만든 주기에는 올리지 않는다(원본 checkAutoUploadFiles)
 		if err := os.MkdirAll(done, 0o755); err != nil {
-			t.c.Emit(EvDialog, Dialog{ID: t.c.dialogSeq.Add(1), Title: "정보", Text: "자동업로드 완료된 파일이 이동할 폴더를 생성하지 못했습니다. -" + done})
+			t.c.dialog("정보", "자동업로드 완료된 파일이 이동할 폴더를 생성하지 못했습니다. -"+done, "")
 		}
 		return
 	}
@@ -1417,7 +1423,7 @@ func (t *Transfers) AutoDownloadOnce() {
 		if f.AutoDown == 1 || f.AutoDown == 3 {
 			if !made[folder] {
 				if err := os.MkdirAll(folder, 0o755); err != nil {
-					t.c.Emit(EvDialog, Dialog{ID: t.c.dialogSeq.Add(1), Title: "정보", Text: "자동다운로드폴더 생성에 실패했습니다. -" + folder})
+					t.c.dialog("정보", "자동다운로드폴더 생성에 실패했습니다. -"+folder, "")
 					t.markAutoRetry()
 					return
 				}

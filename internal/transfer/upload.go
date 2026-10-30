@@ -63,17 +63,22 @@ func HashFile(ctx context.Context, path string, p *Progress) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// ErrCommitLimit 은 다 보낸 뒤 완료 응답 상한을 넘긴 실패의 사유다. 서버에 파일이 올라갔을 수 있어 자동 업로드는 다시 올리지 않는다.
+var ErrCommitLimit = errors.New("완료 응답 상한을 넘겼다")
+
 // UploadSpec 은 보낼 파일 하나다.
 //   - Info: 첫 메시지. Fsize 는 Send 가 연 파일 크기로 채운다
 //   - Stamp: 검사 때 기준값. 영값이 아니면 첫 조각 전·끝 알림 전에 대조해 다르면 -978(원본 097)
 //   - Stall: 보낸 바이트가 이만큼 늘지 않으면 -975(0 이면 끔, fmenv UPLOAD_STALL_SEC)
+//   - Commit: 다 보낸 뒤 서버의 완료 응답을 기다리는 상한. 넘으면 -975(0 이면 끔, fmenv UPLOAD_COMMIT_SEC)
 //   - Limit: 서버 크기 거절(-22·-24) 문구의 %1
 type UploadSpec struct {
-	Path  string
-	Info  *serverfile.FileTransInfo
-	Stamp Stamp
-	Stall time.Duration
-	Limit string
+	Path   string
+	Info   *serverfile.FileTransInfo
+	Stamp  Stamp
+	Stall  time.Duration
+	Commit time.Duration
+	Limit  string
 }
 
 func (sp *UploadSpec) changed() bool {
@@ -211,7 +216,17 @@ func Send(ctx context.Context, c serverfile.ServerFileServiceClient, sp UploadSp
 		cancel()
 		return verdict(CodeBroken, err)
 	}
-	err = <-recvDone
+	var limit <-chan time.Time
+	if sp.Commit > 0 {
+		limit = time.After(sp.Commit)
+	}
+	select {
+	case err = <-recvDone:
+	case <-limit: // 서버는 이 응답 전에 암호화까지 하므로 파일이 올라갔을 수 있다 ― 상한을 넉넉히 둔다
+		stalled.Store(true)
+		cancel()
+		return verdict(CodeStall, ErrCommitLimit)
+	}
 	if err == io.EOF {
 		err = nil
 	}

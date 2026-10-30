@@ -29,8 +29,8 @@ export function FreezeWatchEnabled(): $CancellablePromise<boolean> {
 }
 
 /**
- * InjectNotify 는 시험 진입점이다(SNB_TEST_HOOKS=1 일 때만): 서버 알림 한 건을 받은 것처럼 처리한다.
- * 실서버가 9007 공지를 보내지 않아 이것 없이는 공지 처리를 시험할 길이 없다(docs/port/09 7.4).
+ * InjectNotify 는 시험 진입점이다(개발 빌드이면서 SNB_TEST_HOOKS=1 일 때만): 서버 알림 한 건을 받은 것처럼 처리한다.
+ * 아무 알림이나 흉내 낼 수 있어 배포본에서는 환경변수로도 열리지 않는다. 실서버가 9007 공지를 보내지 않아 이것 없이는 공지 처리를 시험할 길이 없다(docs/port/09 7.4).
  */
 export function InjectNotify(svcno: number, kind: number, side: number, userid: string, msg: string, dat: string): $CancellablePromise<void> {
     return $Call.ByID(2068551209, svcno, kind, side, userid, msg, dat);

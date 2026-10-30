@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"snbapp/internal/applog"
@@ -193,10 +192,8 @@ func (l *LogService) onNotify(h *notifyHub, gen uint64, myID string, m *pbn.Noti
 	}
 }
 
-var dialogSeq atomic.Int64
-
 func (c *Core) dialog(title, text, onClose string) {
-	c.Emit(EvDialog, Dialog{ID: dialogSeq.Add(1), Title: title, Text: text, OnClose: onClose})
+	c.Emit(EvDialog, Dialog{Title: title, Text: text, OnClose: onClose})
 }
 
 // registerDefaults 는 원본 receivedNotify·processNotify 의 기본 처리다.
@@ -374,11 +371,11 @@ func (l *LogService) LogFileEnabled() bool {
 	return err == nil && fi.IsDir()
 }
 
-// InjectNotify 는 시험 진입점이다(SNB_TEST_HOOKS=1 일 때만): 서버 알림 한 건을 받은 것처럼 처리한다.
-// 실서버가 9007 공지를 보내지 않아 이것 없이는 공지 처리를 시험할 길이 없다(docs/port/09 7.4).
+// InjectNotify 는 시험 진입점이다(개발 빌드이면서 SNB_TEST_HOOKS=1 일 때만): 서버 알림 한 건을 받은 것처럼 처리한다.
+// 아무 알림이나 흉내 낼 수 있어 배포본에서는 환경변수로도 열리지 않는다. 실서버가 9007 공지를 보내지 않아 이것 없이는 공지 처리를 시험할 길이 없다(docs/port/09 7.4).
 func (l *LogService) InjectNotify(svcno, kind, side int32, userid, msg, dat string) error {
-	if os.Getenv("SNB_TEST_HOOKS") != "1" {
-		l.c.log.Warn("[시험진입점] notify >>> SNB_TEST_HOOKS 가 없어 무시합니다.", "category", applog.CatApp)
+	if !config.IsDev() || os.Getenv("SNB_TEST_HOOKS") != "1" {
+		l.c.log.Warn("[시험진입점] notify >>> 개발 빌드의 SNB_TEST_HOOKS 가 없어 무시합니다.", "category", applog.CatApp)
 		return ErrNotImplemented
 	}
 	s, err := l.c.Session()

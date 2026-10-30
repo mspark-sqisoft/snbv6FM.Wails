@@ -188,6 +188,7 @@ Wails 판의 지금 상태(2026-10-30, `README.md`·`client.go` 467줄 확인)
   CLIP-054(보류 073, 목록에 `클립보드` 로 표시), LINK-007(확장 출처 확인), LINK-015(보내기 전 로그인 확인), LINK-017(링크 악성 알림 신호),
   LINK-019(PAC 방식), LINK-023(확장 배포), LINK-040(알 수 없는 IPC 모드 거부 로그), LINK-041(외부 업무 시스템 REST 창구), LINK-042(GPKI 인증서 전달).
   이 가운데 Wails 판이 비용 없이 함께 하는 것: CLIP-010(문구에 크기 덧붙이기), CLIP-053(같은 결함을 만들지 않음), CLIP-054(CLIP-041 개선),
+  LINK-007(POST 만 받고 Host 는 루프백 이름만, Origin 이 있으면 확장 스킴만 받는다. 확장 ID 는 고정되지 않아 보지 않는다),
   LINK-015(처리기에서 로그인 확인), LINK-040(모르는 모드 로그). PAC(LINK-019)·REST(LINK-041)·GPKI(LINK-042)는 제외 ― Qt 판도 없고 결정이 없다.
 - **시험 진입점**: IPC `mode=drop·aprv-hold·auto-upload·notify·clip-recv·check-pop-delay·extract-limits·probe` 는 Qt 판 E2E 전용(`SNB_TEST_HOOKS`)이라
   제외. Wails 판 E2E 가 필요하면 그때 따로 정한다.

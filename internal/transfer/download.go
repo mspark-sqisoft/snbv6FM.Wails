@@ -23,10 +23,11 @@ import (
 // PartSuffix 는 받는 중인 파일의 꼬리다. 크기·검사값이 맞은 뒤에만 원래 이름으로 바꾼다.
 const PartSuffix = ".snbpart"
 
-// createPart 는 dest 옆에 쓰는 중 파일을 만든다. 보통은 dest+PartSuffix 이고, 꼬리를 붙이면 파일 이름 상한(255자)을 넘는 등 그 이름을 못 쓰면
-// 짧은 임시 이름이다. ponytail: 임시 이름은 claim 의 찌꺼기 청소가 찾지 못한다 ― 긴 이름을 받다 강제 종료될 때만 남는다.
+// createPart 는 dest 옆에 쓰는 중 파일을 새로 만든다. 보통은 dest+PartSuffix 이고, 그 이름이 이미 있거나 꼬리를 붙이면 파일 이름 상한(255자)을
+// 넘는 등 그 이름을 못 쓰면 짧은 임시 이름이다. 있던 파일은 사용자 것일 수 있어 지우거나 자르지 않는다.
+// ponytail: 그래서 강제 종료가 남긴 쓰는 중 파일도 치우지 않는다 ― 사용자 파일과 가릴 수 없다. 표식이 필요하면 쓰는 중 파일에 앞머리를 넣는다.
 func createPart(dest string) (*os.File, error) {
-	f, err := os.Create(dest + PartSuffix)
+	f, err := os.OpenFile(dest+PartSuffix, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
 	if err == nil {
 		return f, nil
 	}
@@ -35,7 +36,7 @@ func createPart(dest string) (*os.File, error) {
 	if err == nil {
 		probe.Close()
 		os.Remove(dest)
-	} else if !errors.Is(err, os.ErrExist) {
+	} else if !files.Exists(dest) { // 자리에 무엇이든 있으면(폴더 포함) 임시 이름으로 받고 commit 이 번호로 비킨다
 		return nil, err
 	}
 	if f, err = os.CreateTemp(filepath.Dir(dest), "snb*"+PartSuffix); err == nil {
@@ -91,11 +92,6 @@ func taken(p string) bool {
 
 // claim 은 dest(덮어쓰기가 아니면 번호를 붙인 빈 자리)를 잡는다. 놓기는 돌려준 함수.
 func claim(dest string, overwrite bool) (string, func(), error) {
-	// 아무도 받지 않는 자리의 .snbpart 는 지난 강제 종료의 찌꺼기다 ― 번호를 밀어내지 않게 치운다.
-	if _, busy := reserved.LoadOrStore(pathKey(dest), true); !busy {
-		os.Remove(dest + PartSuffix)
-		reserved.Delete(pathKey(dest))
-	}
 	for range 100 {
 		p := dest
 		if !overwrite && taken(p) {
@@ -180,6 +176,7 @@ func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp Downl
 		got     int64
 		release func()
 		dest    string
+		over    bool // 덮어쓰기 요청이 그 자리를 그대로 잡았다(번호로 밀렸으면 거짓)
 	)
 	cleanup := func() {
 		if out != nil {
@@ -214,7 +211,7 @@ func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp Downl
 			if err != nil {
 				return err
 			}
-			dest, release = d, rel
+			dest, release, over = d, rel, sp.Overwrite && d == target
 			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 				return fail(CodeOpen, err)
 			}
@@ -320,7 +317,7 @@ func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp Downl
 		res.Path = path
 		return res, nil
 	}
-	saved, err := commit(part, dest, sp.Overwrite)
+	saved, err := commit(part, dest, over)
 	if err != nil {
 		return nil, err
 	}
@@ -329,18 +326,19 @@ func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp Downl
 	return res, nil
 }
 
-// commit 은 .snbpart 를 dest 로 바꾸고 실제 저장 경로를 돌려준다. 덮어쓰기면 원래 파일을 지운 뒤 바꾸고, 못 바꾸면 번호 붙인 이름으로 남긴다.
+// commit 은 .snbpart 를 dest 로 바꾸고 실제 저장 경로를 돌려준다. 빈 자리이거나 덮어쓰기일 때만 그 자리에 놓고, 원래 파일을 먼저 지우지 않으므로
+// 바꾸기가 실패해도 원래 파일은 남는다. 받는 동안 같은 이름이 생겼거나 바꾸지 못하면 번호 붙인 이름으로 남긴다.
+// ponytail: 자리를 본 뒤 바꾸기 전에 생긴 파일은 바꿔치기된다. 막으려면 겹치면 실패하는 os.Link 로 바꾼다(FAT·일부 망 드라이브는 안 된다).
 func commit(part, dest string, overwrite bool) (string, error) {
-	if overwrite {
-		os.Remove(dest)
+	st, serr := os.Lstat(dest)
+	if serr != nil || overwrite && !st.IsDir() {
+		if replace(part, dest) == nil {
+			return dest, nil
+		}
 	}
-	err := os.Rename(part, dest)
-	if err == nil {
-		return dest, nil
-	}
-	alt, nerr := files.NumberedPath(dest, taken)
-	if nerr != nil {
-		return "", fail(CodeOpen, nerr)
+	alt, err := files.NumberedPath(dest, taken)
+	if err != nil {
+		return "", fail(CodeOpen, err)
 	}
 	if err = os.Rename(part, alt); err != nil {
 		return "", fail(CodeOpen, err)
@@ -348,14 +346,36 @@ func commit(part, dest string, overwrite bool) (string, error) {
 	return alt, nil
 }
 
+// replace 는 같은 폴더의 part 를 dest 로 바꾼다. Windows 는 읽기 전용 파일로 바꾸기를 거절한다 ― 그 표시만 풀고 한 번 더 해 보고,
+// 그래도 안 되면 표시를 되돌린다. 다른 프로그램이 dest 를 열어 둔 경우가 그렇다.
+func replace(part, dest string) error {
+	err := os.Rename(part, dest)
+	if err == nil {
+		return nil
+	}
+	st, serr := os.Stat(dest)
+	if serr != nil || st.Mode().Perm()&0o200 != 0 {
+		return err
+	}
+	os.Chmod(dest, st.Mode().Perm()|0o200)
+	if err = os.Rename(part, dest); err != nil {
+		os.Chmod(dest, st.Mode().Perm())
+	}
+	return err
+}
+
 // placeFolder 는 받은 zip 을 작업 폴더에 안전하게 푼 뒤 저장 자리로 옮긴다.
 // 덮어쓰기면 있는 폴더에 병합하고, 아니면 빈 자리(번호)에 새 폴더로 둔다. 새 폴더였는데 옮기다 실패하면 지운다.
 func placeFolder(ctx context.Context, zipPath string, sp DownloadSpec, p *Progress) (string, error) {
-	work, err := os.MkdirTemp(sp.TempDir, "x")
+	tmp, err := os.MkdirTemp(sp.TempDir, "x")
 	if err != nil {
 		return "", fail(CodeUnzip, err)
 	}
-	defer os.RemoveAll(work)
+	defer os.RemoveAll(tmp)
+	work := filepath.Join(tmp, "out") // MkdirTemp 는 0700 이다 ― 이 폴더가 그대로 저장 자리로 옮겨 간다
+	if err := os.Mkdir(work, 0o755); err != nil {
+		return "", fail(CodeUnzip, err)
+	}
 	if err := ExtractZip(ctx, zipPath, work, sp.Limits, p); err != nil {
 		return "", err
 	}

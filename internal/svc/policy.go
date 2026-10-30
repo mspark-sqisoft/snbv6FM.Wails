@@ -436,7 +436,7 @@ func (k *PolicyChecker) CheckUpload(ctx context.Context, s *nbs.Session, req Che
 		if req.Auto {
 			log.Info("[Auto]" + text)
 		} else {
-			p.c.Emit(EvDialog, Dialog{ID: p.c.dialogSeq.Add(1), Title: "정보", Text: text})
+			p.c.dialog("정보", text, "")
 		}
 		res.Reason = "count"
 		return res, nil
@@ -631,7 +631,7 @@ func (k *PolicyChecker) CheckClipSize(size int64) bool {
 	}
 	ok, text := policy.ClipSizeOK(st, size)
 	if !ok {
-		k.p.c.Emit(EvDialog, Dialog{ID: k.p.c.dialogSeq.Add(1), Title: "정보", Text: text})
+		k.p.c.dialog("정보", text, "")
 	}
 	return ok
 }

@@ -35,8 +35,9 @@ type fakeServer struct {
 	serverfile.UnimplementedServerFileServiceServer
 	mu sync.Mutex
 	// 업로드
-	rejectAfter int // >0 이면 이만큼 조각을 받은 뒤 res=-22
-	holdAfter   int // >0 이면 이만큼 받은 뒤 더 읽지 않는다(정지·취소 시험)
+	rejectAfter int  // >0 이면 이만큼 조각을 받은 뒤 res=-22
+	holdAfter   int  // >0 이면 이만큼 받은 뒤 더 읽지 않는다(정지·취소 시험)
+	holdCommit  bool // 끝까지 받은 뒤 완료 응답을 보내지 않는다
 	gotInfo     *serverfile.FileTransInfo
 	gotBytes    []byte
 	closedSend  bool // 클라이언트가 CloseSend 로 끝냈다(EOF)
@@ -51,6 +52,7 @@ type fakeServer struct {
 	dnErr    error
 	dnChunk  int // 조각 크기(0 이면 1000)
 	gotDown  *serverfile.FileDownloadRequest
+	onDown   func() // 받기 응답을 끝내기 전에 부른다
 }
 
 func (f *fakeServer) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploadRequest, common.AnswerResponse]) error {
@@ -60,7 +62,12 @@ func (f *fakeServer) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploa
 		f.mu.Lock()
 		if err == io.EOF {
 			f.closedSend = true
+			hold := f.holdCommit
 			f.mu.Unlock()
+			if hold {
+				<-st.Context().Done()
+				return st.Context().Err()
+			}
 			return st.Send(&common.AnswerResponse{Res: 1})
 		}
 		if err != nil {
@@ -101,6 +108,9 @@ func (f *fakeServer) FileDownload(req *serverfile.FileDownloadRequest, st grpc.S
 	f.mu.Unlock()
 	if f.dnErr != nil {
 		return f.dnErr
+	}
+	if f.onDown != nil {
+		f.onDown()
 	}
 	if f.sumFirst {
 		st.Send(&serverfile.FileDownloadResponse{Data: &serverfile.FileDownloadResponse_Answer{Answer: &common.AnswerResponse{Res: 1, Code: 3, Reason: f.checksum}}})
@@ -216,6 +226,15 @@ func TestSendStall(t *testing.T) {
 	p := write(t, t.TempDir(), "big.bin", strings.Repeat("x", 30<<20))
 	err := Send(context.Background(), c, UploadSpec{Path: p, Stall: time.Second, Info: &serverfile.FileTransInfo{}}, &Progress{})
 	if CodeOf(err) != CodeStall {
+		t.Fatal(err)
+	}
+}
+
+func TestSendCommitTimeout(t *testing.T) {
+	c := startFake(t, &fakeServer{holdCommit: true})
+	p := write(t, t.TempDir(), "a.txt", "abc")
+	err := Send(context.Background(), c, UploadSpec{Path: p, Commit: 100 * time.Millisecond, Info: &serverfile.FileTransInfo{}}, &Progress{})
+	if CodeOf(err) != CodeStall || !errors.Is(err, ErrCommitLimit) {
 		t.Fatal(err)
 	}
 }
@@ -408,35 +427,139 @@ func TestReceiveClipChecksumFirst(t *testing.T) {
 	}
 }
 
-// 강제 종료가 남긴 .snbpart 는 번호를 밀어내지 않고 치운다.
-func TestReceiveStalePart(t *testing.T) {
+// 자리에 이미 있는 .snbpart 는 사용자 파일일 수 있다 ― 지우지도 자르지도 않고 임시 이름으로 받는다.
+func TestReceiveKeepsExistingPart(t *testing.T) {
 	body := []byte("new")
 	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "a.txt")
-	write(t, dir, "a.txt"+PartSuffix, "stale")
-	spec := DownloadSpec{ServerName: "S", Dest: dest, Size: 3}
-	res, err := Receive(context.Background(), c, spec, &Progress{})
+	mine := write(t, dir, "a.txt"+PartSuffix, "mine")
+	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3}, &Progress{})
 	if err != nil || res.Path != dest {
 		t.Fatal(res, err)
 	}
-	write(t, dir, "a.txt"+PartSuffix, "stale")
-	res, err = Receive(context.Background(), c, spec, &Progress{}) // 자리에 파일이 있어도 찌꺼기는 치운다
-	if err != nil || filepath.Base(res.Path) != "a_00000.txt" {
-		t.Fatal(res, err)
+	if b, _ := os.ReadFile(mine); string(b) != "mine" {
+		t.Fatal("있던 파일이 바뀌었다", string(b))
 	}
-	if _, err := os.Stat(dest + PartSuffix); err == nil {
-		t.Fatal(".snbpart 가 남았다")
+	if names, _ := os.ReadDir(dir); len(names) != 2 {
+		t.Fatal("임시 파일이 남았다", names)
 	}
 }
 
-// 덮어쓸 자리를 못 비우면 번호 이름으로 남기고, 그 경로를 돌려준다.
+// 덮어쓰기라도 바꾸기가 실패하면 원래 파일은 그대로다.
+func TestCommitKeepsOriginalOnFailure(t *testing.T) {
+	dir := t.TempDir()
+	dest := write(t, dir, "a.txt", "old")
+	if _, err := commit(filepath.Join(dir, "없는 파일"), dest, true); err == nil {
+		t.Fatal("실패해야 한다")
+	}
+	if b, _ := os.ReadFile(dest); string(b) != "old" {
+		t.Fatal("원래 파일이 사라졌다")
+	}
+}
+
+func TestCommitOverwritesReadOnly(t *testing.T) {
+	dir := t.TempDir()
+	dest := write(t, dir, "a.txt", "old")
+	if err := os.Chmod(dest, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := commit(write(t, dir, "a.txt"+PartSuffix, "new"), dest, true)
+	if err != nil || saved != dest {
+		t.Fatal(saved, err)
+	}
+	if b, _ := os.ReadFile(dest); string(b) != "new" {
+		t.Fatal(string(b))
+	}
+}
+
+// 덮어쓸 파일을 다른 프로그램이 열어 두면 바꾸지 못한다 ― 원래 파일과 읽기 전용 표시는 그대로이고 번호 이름으로 남는다.
+func TestCommitDestHeld(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows 전용")
+	}
+	dir := t.TempDir()
+	dest := write(t, dir, "a.txt", "old")
+	if err := os.Chmod(dest, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.Close(); os.Chmod(dest, 0o644) })
+	saved, err := commit(write(t, dir, "a.txt"+PartSuffix, "new"), dest, true)
+	if err != nil || filepath.Base(saved) != "a_00000.txt" {
+		t.Fatal(saved, err)
+	}
+	if b, _ := os.ReadFile(dest); string(b) != "old" {
+		t.Fatal("원래 파일이 바뀌었다", string(b))
+	}
+	if st, _ := os.Stat(dest); st.Mode().Perm()&0o200 != 0 {
+		t.Fatal("읽기 전용 표시가 풀렸다")
+	}
+}
+
+// 받는 동안 같은 이름의 파일이 생겨도 덮어쓰기가 아니면 그 파일을 바꾸지 않는다.
+func TestCommitAvoidsFileThatAppeared(t *testing.T) {
+	dir := t.TempDir()
+	dest := write(t, dir, "a.txt", "user")
+	saved, err := commit(write(t, dir, "a.txt"+PartSuffix, "new"), dest, false)
+	if err != nil || filepath.Base(saved) != "a_00000.txt" {
+		t.Fatal(saved, err)
+	}
+	if b, _ := os.ReadFile(dest); string(b) != "user" {
+		t.Fatal("생긴 파일이 바뀌었다", string(b))
+	}
+}
+
+// 덮어쓰기 요청이 앞 받기에 밀려 번호 자리로 가면 덮어쓰기가 풀린다 ― 사용자가 동의한 자리는 번호 자리가 아니다.
+func TestReceiveNumberedIsNotOverwrite(t *testing.T) {
+	body := []byte("new")
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "a.txt")
+	alt := filepath.Join(dir, "a_00000.txt")
+	reserved.Store(pathKey(dest), true) // 앞 받기가 dest 를 잡고 있다
+	defer reserved.Delete(pathKey(dest))
+	c := startFake(t, &fakeServer{data: body, checksum: sum(body), onDown: func() {
+		for range 5000 { // 번호 자리를 잡은 뒤에 같은 이름의 파일을 만든다
+			if _, err := os.Stat(alt + PartSuffix); err == nil {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		os.WriteFile(alt, []byte("user"), 0o644)
+	}})
+	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3, Overwrite: true}, &Progress{})
+	if err != nil || res.Path == alt {
+		t.Fatal(res, err)
+	}
+	if b, _ := os.ReadFile(alt); string(b) != "user" {
+		t.Fatal("번호 자리의 파일이 바뀌었다", string(b))
+	}
+}
+
+// 자리에 폴더와 .snbpart 가 함께 있어도 받기를 시작하고 번호 이름으로 남긴다.
+func TestReceiveOverwriteDirWithPart(t *testing.T) {
+	body := []byte("new")
+	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "a.txt")
+	write(t, dest, "x", "y")
+	write(t, dir, "a.txt"+PartSuffix, "mine")
+	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3, Overwrite: true}, &Progress{})
+	if err != nil || filepath.Base(res.Path) != "a_00000.txt" {
+		t.Fatal(res, err)
+	}
+}
+
+// 덮어쓸 자리가 폴더면 번호 이름으로 남기고, 그 경로를 돌려준다.
 func TestReceiveOverwriteBlocked(t *testing.T) {
 	body := []byte("new")
 	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "a.txt")
-	write(t, dest, "x", "y") // 비어 있지 않은 폴더는 지워지지 않는다
+	write(t, dest, "x", "y") // dest 를 폴더로 만든다
 	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3, Overwrite: true}, &Progress{})
 	if err != nil || filepath.Base(res.Path) != "a_00000.txt" {
 		t.Fatal(res, err)
@@ -465,7 +588,7 @@ func TestMoveFileKeepsDstWhenPartHeld(t *testing.T) {
 	dir := t.TempDir()
 	dst := write(t, dir, "d.txt", "old")
 	src := write(t, dir, "s.txt", "new")
-	for _, p := range []string{src, dst + PartSuffix} { // src 를 잡으면 첫 바꾸기가 실패해 복사로 간다
+	for _, p := range []string{src, dst} { // src 를 잡으면 첫 바꾸기가 실패해 복사로 가고, dst 를 잡으면 마지막 바꾸기가 실패한다
 		f, err := os.OpenFile(p, os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
 			t.Fatal(err)
@@ -569,6 +692,56 @@ func TestManagerCancelAfterSuccessIsDone(t *testing.T) {
 	m.Cancel(id)
 	if r := <-result; r.State != Done || r.Err != nil {
 		t.Fatalf("%+v", r)
+	}
+}
+
+// 끝난 행은 세션을 쥔 함수를 놓고, 끝난 순서로 maxFinished 를 넘는 만큼 사라진다 ― 오래 걸린 전송의 행은 끝나자마자 사라지지 않는다.
+func TestManagerReleasesFinished(t *testing.T) {
+	m := NewManager(5, 0, Hooks{})
+	var finished atomic.Int32
+	job := Job{Dir: Up, Name: "f",
+		Run:  func(context.Context, *Progress) error { return nil },
+		Done: func(Result) { finished.Add(1) }}
+	first, err := m.Add(job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return finished.Load() == 1 })
+	m.mu.Lock()
+	r := m.runs[first]
+	released := r.job.Run == nil && r.job.Done == nil
+	m.mu.Unlock()
+	if !released {
+		t.Fatal("끝난 행이 함수를 쥐고 있다")
+	}
+	gate := make(chan struct{})
+	slow, err := m.Add(Job{Dir: Up, Name: "slow",
+		Run:  func(context.Context, *Progress) error { <-gate; return errors.New("실패") },
+		Done: func(Result) { finished.Add(1) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range maxFinished {
+		if _, err := m.Add(job); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitFor(t, func() bool { return finished.Load() == maxFinished+1 })
+	close(gate)
+	waitFor(t, func() bool { return finished.Load() == maxFinished+2 })
+	m.mu.Lock()
+	_, kept := m.runs[first]
+	st := m.q.State(first)
+	_, slowKept := m.runs[slow]
+	m.mu.Unlock()
+	if kept || st != Unknown {
+		t.Fatal("가장 먼저 끝난 행이 남았다", kept, st)
+	}
+	if !slowKept {
+		t.Fatal("방금 끝난 행이 사라졌다")
+	}
+	if n := len(m.Items()); n != maxFinished {
+		t.Fatal(n)
 	}
 }
 

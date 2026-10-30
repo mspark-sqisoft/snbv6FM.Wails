@@ -47,7 +47,6 @@ export interface Notice {
   text: string
 }
 export interface GoDialog {
-  id: number
   title: string
   text: string
   onClose: '' | 'exit' | 'logoutProcess'

@@ -58,7 +58,7 @@ func (c *ClipService) log() *slog.Logger { return c.c.Log().With("category", app
 func (c *ClipService) info(text string) { c.dialog("정보", text) }
 
 func (c *ClipService) dialog(title, text string) {
-	c.c.Emit(EvDialog, Dialog{ID: c.c.dialogSeq.Add(1), Title: title, Text: text})
+	c.c.dialog(title, text, "")
 }
 
 func clipAllowed(s *nbs.Session, up bool) bool {
