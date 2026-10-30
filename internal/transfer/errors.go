@@ -43,6 +43,7 @@ const (
 	CodeLoggedOut      = -9998 // 로그아웃으로 정리(Wails 판)
 	CodeFolderChanged  = -9978 // 검사 뒤 폴더가 바뀜(창 문구가 달라 따로 둔다)
 	CodeDuplicateQueue = -9997 // 같은 파일이 이미 대기·진행 중(Wails 판)
+	CodeCommitUnknown  = -9996 // 다 보냈지만 서버의 완료 응답을 받지 못함(Wails 판)
 )
 
 // Fail 은 전송 실패 하나다. Arg 는 문구의 %1(크기 상한 등), Arg2 는 %2.
@@ -133,6 +134,7 @@ var texts = map[int]string{
 	CodeLoggedOut:      "로그아웃되어 전송을 멈췄습니다.",
 	CodeFolderChanged:  "검사한 뒤 폴더 '%1' 의 내용이 바뀌어 올리지 않았습니다. 다시 올려 주세요.",
 	CodeDuplicateQueue: "같은 파일이 이미 전송 대기열에 있습니다.",
+	CodeCommitUnknown:  "파일을 다 보냈지만 서버의 완료 응답을 받지 못했습니다.\n서버에 올라갔을 수 있으니 서버 파일 목록을 확인한 뒤 다시 올려 주세요.",
 	-950:               "데이타 암호화 실패",
 	-951:               "데이타 복호화 실패",
 }

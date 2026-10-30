@@ -158,7 +158,7 @@ func (ts *TransferService) DownloadTo(serverNames []string, dir string) error {
 // Items 는 대기열 전체다(서랍을 처음 열 때. 그 뒤는 transfer:state·transfer:progress 로 고친다).
 func (ts *TransferService) Items() ([]transfer.Item, error) { return ts.t.m.Items(), nil }
 
-// Cancel 은 전송 하나를 취소한다(대기 중이면 빼고, 진행 중이면 끊는다 ― 올리던 것은 서버가, 받던 것은 앱이 지운다).
+// Cancel 은 전송 하나를 취소한다(대기 중이면 빼고, 진행 중이면 끊는다 ― 다 보내기 전이면 올리던 것은 서버가, 받던 것은 앱이 지운다).
 func (ts *TransferService) Cancel(id int64) error {
 	if ts.t.m.Cancel(id) {
 		ts.t.log(applog.CatUpload).Info("전송 취소", "id", id)
@@ -222,9 +222,10 @@ type Transfers struct {
 	autoUp    *time.Ticker
 	autoUpEnd chan struct{}
 	autoDn    *time.Timer
-	autoPaths map[string]bool // 자동 업로드로 대기·진행 중인 PC 경로
-	gotAuto   map[string]bool // 이 로그인에서 자동 다운로드로 넣은 server_str
-	autoRetry bool            // 자동 다운로드가 실패해 다음 목록 응답에 다시 돈다
+	autoPaths map[string]bool          // 자동 업로드로 대기·진행 중인 PC 경로
+	autoSent  map[string]UploadRequest // 완료 응답을 못 받은 자동 업로드(PC 경로별)
+	gotAuto   map[string]bool          // 이 로그인에서 자동 다운로드로 넣은 server_str
+	autoRetry bool                     // 자동 다운로드가 실패해 다음 목록 응답에 다시 돈다
 	refresh   *time.Timer
 	fails     []string
 	failT     *time.Timer
@@ -315,6 +316,7 @@ func (t *Transfers) onLogin(s *nbs.Session) {
 	t.login, t.logout = ctx, cancel
 	t.gotAuto = map[string]bool{}
 	t.autoPaths = map[string]bool{}
+	t.autoSent = map[string]UploadRequest{}
 	t.owner = transfer.OwnerNone
 	t.mu.Unlock()
 	t.restartAuto(s)
@@ -545,7 +547,7 @@ func (t *Transfers) pickFailed(err error, auto bool) {
 	case auto:
 		log.Info("[Auto]결재자 정하기 실패", "err", err)
 	case errors.Is(err, approval.ErrNoApprover):
-		t.c.dialog("정보", err.Error(), "")
+		t.c.info(err.Error())
 	default:
 		log.Warn("결재자 정하기 실패", "err", err)
 		t.c.Emit(EvNotice, Notice{Severity: SevWarning, Text: err.Error()})
@@ -724,6 +726,7 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 		sum = h
 		return nil
 	}
+	unknown := false // 완료 응답을 못 받았다. 취소가 실패 사유를 덮어도 남도록 Run 이 적고 뒤이어 같은 고루틴의 Done 이 읽는다
 	run := func(ctx context.Context, p *transfer.Progress) error {
 		pk := r.Pick
 		if pk == nil {
@@ -746,12 +749,13 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 		sctx, cancel := transfer.SessionCtx(ctx, s)
 		defer cancel()
 		spec := transfer.UploadSpec{Path: sendPath, Info: info, Stall: time.Duration(t.envInt("UPLOAD_STALL_SEC", 30)) * time.Second,
-			Commit: time.Duration(t.envInt("UPLOAD_COMMIT_SEC", 3600)) * time.Second, // 기본값은 서버의 스트림 상한 FM_STREAM_TIMEOUT(60분)이다
+			Commit: time.Duration(t.envInt("UPLOAD_COMMIT_SEC", 3600)) * time.Second, // 앱이 기다리기를 멈추는 시간이다. 서버는 저장을 계속하므로 넘겨도 파일이 올라갈 수 있다
 			Limit:  files.SizeText(uint64(s.Info.GetFmFileSize()) * 1024)}
 		if !isDir {
 			spec.Stamp = r.stamp
 		}
 		err := transfer.Send(sctx, s.ServerFile(), spec, p)
+		unknown = errors.Is(err, transfer.ErrCommitUnknown)
 		if transfer.CodeOf(err) == transfer.CodeChanged {
 			log.Info(fmt.Sprintf("업로드 취소 >>> 검사 뒤 내용이 달라졌다 >>> 파일: %s", r.Path))
 		}
@@ -759,8 +763,9 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 	}
 	done := func(res transfer.Result) {
 		cleanup()
-		if !errors.Is(res.Err, transfer.ErrCommitLimit) { // 서버에 올라갔을 수 있다 ― 표시를 남겨 자동 업로드가 다시 올리지 않게 한다(다시 로그인하면 풀린다)
-			t.unmarkAuto(r)
+		t.settleAuto(r, unknown)
+		if unknown && r.Auto {
+			log.Warn(fmt.Sprintf("[Auto]완료 응답을 받지 못해 같은 내용은 이 로그인 동안 다시 올리지 않는다 - %s", r.Path))
 		}
 		switch {
 		case res.Err == nil:
@@ -811,9 +816,22 @@ func (t *Transfers) folderSame(r UploadRequest, when string) error {
 	if r.baseline == nil {
 		return nil
 	}
-	now, err := transfer.Snapshot(r.Path)
+	d, err := r.folderDiff()
 	if err != nil {
 		return &transfer.Fail{Code: transfer.CodeOpen, Cause: err}
+	}
+	if !d.Empty() {
+		t.log(applog.CatUpload).Info(fmt.Sprintf("업로드 취소 >>> 검사 뒤 내용이 달라졌다(%s) >>> 폴더: %s %s", when, r.Path, d))
+		return &transfer.Fail{Code: transfer.CodeFolderChanged, Arg: filepath.Base(r.Path)}
+	}
+	return nil
+}
+
+// folderDiff 는 폴더가 검사 때와 달라진 내용이다.
+func (r UploadRequest) folderDiff() (transfer.SnapDiff, error) {
+	now, err := transfer.Snapshot(r.Path)
+	if err != nil {
+		return transfer.SnapDiff{}, err
 	}
 	var ignore []string
 	for _, e := range r.excludes {
@@ -821,11 +839,17 @@ func (t *Transfers) folderSame(r UploadRequest, when string) error {
 			ignore = append(ignore, filepath.ToSlash(rel))
 		}
 	}
-	if d := transfer.DiffSnapshots(r.baseline, now, ignore...); !d.Empty() {
-		t.log(applog.CatUpload).Info(fmt.Sprintf("업로드 취소 >>> 검사 뒤 내용이 달라졌다(%s) >>> 폴더: %s %s", when, r.Path, d))
-		return &transfer.Fail{Code: transfer.CodeFolderChanged, Arg: filepath.Base(r.Path)}
+	return transfer.DiffSnapshots(r.baseline, now, ignore...), nil
+}
+
+// unchanged 는 파일·폴더가 검사 때 그대로인가다. 기준값이 없으면 거짓이다.
+func (r UploadRequest) unchanged() bool {
+	if r.baseline != nil {
+		d, err := r.folderDiff()
+		return err == nil && d.Empty()
 	}
-	return nil
+	now, err := transfer.StampOf(r.Path)
+	return err == nil && now == r.stamp
 }
 
 func (t *Transfers) markAuto(r UploadRequest) {
@@ -844,6 +868,43 @@ func (t *Transfers) unmarkAuto(r UploadRequest) {
 		delete(t.autoPaths, filepath.Clean(r.Path))
 		t.mu.Unlock()
 	}
+}
+
+// settleAuto 는 끝난 자동 업로드의 표시를 지운다. 완료 응답을 못 받았으면(unknown) 서버에 올라갔을 수 있어 요청을 남긴다 ―
+// 검사 때 내용 그대로면 다시 올리지 않고, 내용이 바뀌면 새로 올린다. 다시 로그인하면 풀린다: 실제로 실패한 파일을 살리는 길이 이것뿐이다.
+func (t *Transfers) settleAuto(r UploadRequest, unknown bool) {
+	if !r.Auto {
+		return
+	}
+	c := filepath.Clean(r.Path)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if unknown && t.autoSent != nil {
+		t.autoSent[c] = r
+	}
+	delete(t.autoPaths, c)
+}
+
+// autoPending 은 자동 업로드 후보에서 이번에 올릴 것만 남긴다: 대기·진행 중인 것과, 완료 응답을 못 받은 내용 그대로인 것을 뺀다.
+func (t *Transfers) autoPending(list []string) []string {
+	var out []string
+	for _, p := range list {
+		c := filepath.Clean(p)
+		t.mu.Lock()
+		busy := t.autoPaths[c]
+		sent, marked := t.autoSent[c]
+		t.mu.Unlock()
+		if busy || marked && sent.unchanged() { // 폴더 대조는 파일을 훑으므로 잠금 밖에서 한다
+			continue
+		}
+		if marked {
+			t.mu.Lock()
+			delete(t.autoSent, c)
+			t.mu.Unlock()
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func speedText(r transfer.Result) string {
@@ -936,17 +997,22 @@ func (t *Transfers) DownloadTo(serverNames []string, dir string) error {
 	case len(blocked) == 1 && len(ok) == 0:
 		t.c.Emit(EvNotice, Notice{Severity: SevWarning, Text: blocked[0]})
 	case len(blocked) > 0:
-		t.c.dialog("정보", strings.Join(blocked, "\n"), "")
+		t.c.info(strings.Join(blocked, "\n"))
 	}
 	if len(ok) == 0 {
 		return nil
 	}
+	return t.requestDownload(downloadReq{s: s, gen: t.c.Gen(), list: ok, dir: dir})
+}
+
+// requestDownload 는 받기 요청을 줄에 넣는다. 줄이 차면 기다리지 않고 알린다.
+func (t *Transfers) requestDownload(req downloadReq) error {
 	select {
-	case t.reqs <- downloadReq{s: s, gen: t.c.Gen(), list: ok, dir: dir}:
+	case t.reqs <- req:
+		return nil
 	default:
 		return ErrDownloadBusy
 	}
-	return nil
 }
 
 func (t *Transfers) downloadLoop() {
@@ -1314,7 +1380,7 @@ func (t *Transfers) AutoUploadOnce() {
 	done := filepath.Join(dir, transfer.DoneDir)
 	if !files.Exists(done) { // 만든 주기에는 올리지 않는다(원본 checkAutoUploadFiles)
 		if err := os.MkdirAll(done, 0o755); err != nil {
-			t.c.dialog("정보", "자동업로드 완료된 파일이 이동할 폴더를 생성하지 못했습니다. -"+done, "")
+			t.c.info("자동업로드 완료된 파일이 이동할 폴더를 생성하지 못했습니다. -" + done)
 		}
 		return
 	}
@@ -1323,14 +1389,7 @@ func (t *Transfers) AutoUploadOnce() {
 		log.Warn("[Auto]자동 업로드 폴더를 읽지 못했다", "err", err)
 		return
 	}
-	t.mu.Lock()
-	var paths []string
-	for _, p := range list {
-		if !t.autoPaths[filepath.Clean(p)] {
-			paths = append(paths, p)
-		}
-	}
-	t.mu.Unlock()
+	paths := t.autoPending(list)
 	if len(paths) == 0 {
 		return
 	}
@@ -1423,7 +1482,7 @@ func (t *Transfers) AutoDownloadOnce() {
 		if f.AutoDown == 1 || f.AutoDown == 3 {
 			if !made[folder] {
 				if err := os.MkdirAll(folder, 0o755); err != nil {
-					t.c.dialog("정보", "자동다운로드폴더 생성에 실패했습니다. -"+folder, "")
+					t.c.info("자동다운로드폴더 생성에 실패했습니다. -" + folder)
 					t.markAutoRetry()
 					return
 				}

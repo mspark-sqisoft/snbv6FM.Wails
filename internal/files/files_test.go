@@ -159,7 +159,7 @@ func TestSanitize(t *testing.T) {
 	if got := sanitizeFor("linux", `a:b/c`+"\x00"); got != "a:b c " {
 		t.Errorf("linux: %q", got)
 	}
-	for _, bad := range []string{"", ".", "..", " "} {
+	for _, bad := range []string{"", ".", "..", " ", ".snb_write_a.txt.snbpart", ".SNB_WRITE_A.TXT"} {
 		if _, err := SavePath("d", bad); err == nil {
 			t.Errorf("%q 를 받았다", bad)
 		}

@@ -196,6 +196,9 @@ func (c *Core) dialog(title, text, onClose string) {
 	c.Emit(EvDialog, Dialog{Title: title, Text: text, OnClose: onClose})
 }
 
+// info 는 제목이 「정보」 인 알림 창을 띄운다.
+func (c *Core) info(text string) { c.dialog("정보", text, "") }
+
 // registerDefaults 는 원본 receivedNotify·processNotify 의 기본 처리다.
 func (l *LogService) registerDefaults(h *notifyHub) {
 	c := l.c

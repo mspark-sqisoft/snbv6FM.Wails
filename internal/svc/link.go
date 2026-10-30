@@ -337,7 +337,7 @@ func (l *LinkService) domainOn() bool {
 func (l *LinkService) hostsFailed(text string, err error) {
 	l.log().Warn(text, "err", err)
 	if l.hostsWarned.CompareAndSwap(false, true) {
-		l.c.dialog("정보", text, "")
+		l.c.info(text)
 	}
 }
 

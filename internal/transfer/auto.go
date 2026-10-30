@@ -30,7 +30,7 @@ func FolderProblem(dir string) string {
 	return ""
 }
 
-// AutoCandidates 는 자동 업로드 폴더 바로 아래의 파일·폴더다(완료 폴더·숨김·쓰기 시험 파일 제외, 원본 checkAutoUploadFiles).
+// AutoCandidates 는 자동 업로드 폴더 바로 아래의 파일·폴더다(완료 폴더·숨김·앱이 잠깐 만든 파일 제외, 원본 checkAutoUploadFiles).
 func AutoCandidates(dir string) ([]string, error) {
 	ents, err := os.ReadDir(dir)
 	if err != nil {
@@ -39,7 +39,7 @@ func AutoCandidates(dir string) ([]string, error) {
 	var out []string
 	for _, e := range ents {
 		n := e.Name()
-		if (e.IsDir() && strings.EqualFold(n, DoneDir)) || strings.HasPrefix(n, ".snb_write_") || hidden(n, e) {
+		if (e.IsDir() && strings.EqualFold(n, DoneDir)) || strings.HasPrefix(n, files.WritePrefix) || hidden(n, e) {
 			continue
 		}
 		out = append(out, filepath.Join(dir, n))

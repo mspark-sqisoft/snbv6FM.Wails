@@ -376,6 +376,15 @@ func TestAutoCandidatesAndMoveToDone(t *testing.T) {
 	write(t, r, "done/old.txt", "o")
 	hf, _ := hiddenNames()
 	hide(t, write(t, r, hf, "h"))
+	part, err := createPart(filepath.Join(r, "받는 중.txt")) // 받는 폴더와 같은 폴더여도 쓰는 중 파일은 올리지 않는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	part.Close()
+	if part, err = tempPart(filepath.Join(r, "긴 이름.txt")); err != nil {
+		t.Fatal(err)
+	}
+	part.Close()
 	got, err := AutoCandidates(r)
 	if err != nil {
 		t.Fatal(err)

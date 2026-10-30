@@ -260,14 +260,16 @@ func (r *run) release() func(Result) {
 	return done
 }
 
-// retireLocked 는 끝난 행을 적어 두고, 끝난 행이 maxFinished 를 넘으면 가장 먼저 끝난 것을 지운다.
+// retireLocked 는 끝난 행을 적어 두고, 끝난 행이 maxFinished 를 넘으면 가장 먼저 끝난 것을 지운다. 창 없이 지나간 실패는 이 행이 유일한 화면 표시라
+// 실패 행은 나머지를 다 지운 뒤에야 지운다. 방금 끝난 행은 지우지 않는다 ― 화면에 나오기도 전에 사라진다.
 func (m *Manager) retireLocked(id int64) {
 	m.ended = append(m.ended, id)
 	if len(m.ended) <= maxFinished {
 		return
 	}
-	old := m.ended[0]
-	m.ended = m.ended[1:]
+	i := max(slices.IndexFunc(m.ended[:len(m.ended)-1], func(x int64) bool { return m.runs[x].state != Failed }), 0)
+	old := m.ended[i]
+	m.ended = slices.Delete(m.ended, i, i+1)
 	delete(m.runs, old)
 	m.q.Forget(old)
 	m.order = slices.DeleteFunc(m.order, func(x int64) bool { return x == old })

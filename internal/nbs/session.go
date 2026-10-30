@@ -50,6 +50,9 @@ type Session struct {
 	DefaultPassword bool   // 로그인 비밀번호가 정책 default_pw 와 같다(AUTH-044)
 }
 
+// NewTestSession 은 가짜 서버 연결로 세션을 만든다. 다른 패키지의 시험이 쓰고 앱 코드는 쓰지 않는다.
+func NewTestSession(conn *grpc.ClientConn) *Session { return &Session{conn: conn} }
+
 // Close 는 연결(TCP)을 닫는다 = 서버 로그아웃. 두 번 불러도 된다.
 func (s *Session) Close() error { return s.conn.Close() }
 

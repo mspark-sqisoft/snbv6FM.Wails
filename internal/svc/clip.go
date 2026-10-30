@@ -55,12 +55,6 @@ func newClipService(c *Core) *ClipService {
 
 func (c *ClipService) log() *slog.Logger { return c.c.Log().With("category", applog.CatClipboard) }
 
-func (c *ClipService) info(text string) { c.dialog("정보", text) }
-
-func (c *ClipService) dialog(title, text string) {
-	c.c.dialog(title, text, "")
-}
-
 func clipAllowed(s *nbs.Session, up bool) bool {
 	return clip.AllowClip(s.IsBusiness(), up, s.Info.GetFmClipUp(), s.Info.GetFmClipDown())
 }
@@ -102,11 +96,11 @@ func (c *ClipService) Upload() error {
 func (c *ClipService) upload() {
 	content, err := clip.Read()
 	if err != nil {
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return
 	}
 	if content.Kind == clip.KindNone || content.Kind == clip.KindText && content.Text == "" {
-		c.info("저장된 클립보드가 없습니다.")
+		c.c.info("저장된 클립보드가 없습니다.")
 		return
 	}
 	s, err := c.c.Session()
@@ -114,20 +108,20 @@ func (c *ClipService) upload() {
 		return
 	}
 	if !clipAllowed(s, true) {
-		c.info("클립보드 업로드가 허용되어 있지 않습니다.")
+		c.c.info("클립보드 업로드가 허용되어 있지 않습니다.")
 		return
 	}
 	t := c.c.Transfers()
 	ctx, cancel, token, err := t.claim(false)
 	if err != nil {
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return
 	}
 	defer t.release(token, cancel)
 	queued, err := c.send(ctx, s, content, nil)
 	if err != nil {
 		c.log().Warn("클립보드 보내기 실패", "err", err)
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return
 	}
 	if !queued {
@@ -217,11 +211,11 @@ func (c *ClipService) download(paste bool) {
 		return
 	}
 	if c.count.Load() < 1 {
-		c.info("다운로드 가능한 클립보드가 없습니다.")
+		c.c.info("다운로드 가능한 클립보드가 없습니다.")
 		return
 	}
 	if !clipAllowed(s, false) {
-		c.info("클립보드 다운로드가 제한되어 있습니다.")
+		c.c.info("클립보드 다운로드가 제한되어 있습니다.")
 		return
 	}
 	if !c.receiving.CompareAndSwap(false, true) {
@@ -239,7 +233,7 @@ func (c *ClipService) download(paste bool) {
 	})
 	if err != nil {
 		c.receiving.Store(false)
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return
 	}
 	c.c.Emit(EvTransferOpen, nil)
@@ -278,7 +272,7 @@ func (c *ClipService) deliver(res *transfer.DownloadResult) bool {
 	data, err := os.ReadFile(res.Path)
 	if err != nil {
 		log.Warn("받은 클립보드 파일을 읽지 못했다", "err", err)
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return false
 	}
 	in, err := clip.Interpret(data, filepath.Ext(res.Path))
@@ -288,12 +282,12 @@ func (c *ClipService) deliver(res *transfer.DownloadResult) bool {
 		return false
 	case err != nil:
 		log.Warn("클립보드 수신 >>> 그림 거부: " + err.Error())
-		c.dialog("클립보드 받기", "받은 클립보드 그림을 열 수 없습니다. PNG·JPEG·GIF·BMP·WEBP·TIFF 형식만 받을 수 있습니다.")
+		c.c.dialog("클립보드 받기", "받은 클립보드 그림을 열 수 없습니다. PNG·JPEG·GIF·BMP·WEBP·TIFF 형식만 받을 수 있습니다.", "")
 		return false
 	}
 	if err := in.Put(); err != nil {
 		log.Warn("클립보드에 넣지 못했다", "err", err)
-		c.info(err.Error())
+		c.c.info(err.Error())
 		return false
 	}
 	if in.Scripts > 0 {

@@ -15,7 +15,7 @@ import (
 // ErrStorageNotEnough 는 받을 자리의 남은 공간이 파일보다 작을 때다(원본 STORAGE_NOT_ENOUGH 문구).
 var ErrStorageNotEnough = errors.New("저장소의 용량이 부족합니다.")
 
-// ErrBadName 은 정리한 뒤의 이름이 비었거나 "."·".." 일 때다(서버 이름이 받을 폴더를 벗어나지 못하게).
+// ErrBadName 은 정리한 뒤의 이름이 비었거나 "."·".." 이거나(서버 이름이 받을 폴더를 벗어나지 못하게) WritePrefix 로 시작할 때다(앱의 쓰는 중 파일로 오인돼 지워진다).
 var ErrBadName = errors.New("저장할 수 없는 파일 이름입니다.")
 
 // ErrNoNumber 는 _00000~_99999 가 다 찼을 때다. 원본은 원래 이름에 덮어썼다 ― 여기는 실패(원본 FILE_OPEN_FAILED 문구).
@@ -37,7 +37,7 @@ func sanitizeFor(goos, name string) string {
 // SavePath 는 받을 자리 dir 와 표의 [파일명](DisplayName)으로 저장 경로를 만든다.
 func SavePath(dir, name string) (string, error) {
 	n := SanitizeName(name)
-	if strings.TrimSpace(n) == "" || n == "." || n == ".." {
+	if strings.TrimSpace(n) == "" || n == "." || n == ".." || strings.HasPrefix(strings.ToLower(n), WritePrefix) {
 		return "", ErrBadName
 	}
 	return filepath.Join(dir, n), nil
@@ -208,6 +208,9 @@ func AutoTarget(autoDown int32, p AutoPolicy) (folder string, skip AutoSkip) {
 	return folder, AutoNone
 }
 
+// WritePrefix 는 앱이 사용자 폴더에 잠깐 만드는 파일·폴더의 이름 앞머리다. 받는 파일은 이 이름을 쓸 수 없고(SavePath) 자동 업로드 후보에서 빠진다.
+const WritePrefix = ".snb_write_"
+
 // UsableFolder 는 dir 가 있고 폴더이며 실제로 파일을 만들 수 있는지다(원본: 읽기 전용 속성은 ACL 을 못 봐 임시 파일을 만들어 본다).
 func UsableFolder(dir string) error {
 	st, err := os.Stat(dir)
@@ -217,7 +220,7 @@ func UsableFolder(dir string) error {
 	if !st.IsDir() {
 		return fmt.Errorf("폴더가 아닙니다: %s", dir)
 	}
-	f, err := os.CreateTemp(dir, ".snb_write_*")
+	f, err := os.CreateTemp(dir, WritePrefix+"*")
 	if err != nil {
 		return err
 	}

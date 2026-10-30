@@ -241,6 +241,29 @@ func TestClassifyFileDriveOnly(t *testing.T) {
 	}
 }
 
+// file: 주소의 판정은 PC 종류별로 다르다: Windows 는 드라이브 경로만, 그 밖은 절대 경로를 남긴다.
+func TestFileURLPathByOS(t *testing.T) {
+	for _, c := range []struct {
+		v       string
+		windows bool
+		want    string
+		ok      bool
+	}{
+		{"file:///C:/a/../b.png", true, "C:/b.png", true},
+		{"file:///tmp/a.png", true, "", false},
+		{"file:////evil/s/../../C:/x.png", true, "", false},
+		{"file:///%5C%5Cevil%5Cs/../../C:/x.png", true, "", false},
+		{"file:///tmp/a/../b.png", false, "/tmp/b.png", true},
+		{"file:a.png", false, "", false},
+		{"file://host/a.png", false, "", false},
+	} {
+		got, ok := fileURLPath(c.v, c.windows)
+		if ok != c.ok || ok && got != c.want {
+			t.Errorf("%s(windows=%v): %q %v", c.v, c.windows, got, ok)
+		}
+	}
+}
+
 func TestResolvedAllowed(t *testing.T) {
 	addrs := func(s ...string) []netip.Addr {
 		var out []netip.Addr

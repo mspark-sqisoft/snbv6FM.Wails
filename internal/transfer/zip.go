@@ -320,7 +320,8 @@ func MergeDir(src, dst string) error {
 
 // moveFile 은 src 를 dst 로 옮긴다(dst 가 있으면 바꾼다). 새 내용을 옆에 다 쓴 뒤에 바꾸고 dst 를 지우지 않으므로 실패해도 dst 의 내용은 그대로다.
 func moveFile(src, dst string) error {
-	if err := os.Rename(src, dst); err == nil {
+	if err := replace(src, dst); err == nil {
+		inheritACL(dst)
 		return nil
 	}
 	in, err := os.Open(src)
@@ -328,7 +329,7 @@ func moveFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := createPart(dst)
+	out, err := tempPart(dst) // 병합은 파일마다 자리를 잡지 않아 같은 파일을 받는 쪽과 겹칠 수 있다 ― 이름을 나눠 쓴다
 	if err != nil {
 		return err
 	}
@@ -342,12 +343,9 @@ func moveFile(src, dst string) error {
 		os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, dst); err != nil {
-		os.Chmod(dst, 0o644) // 읽기 전용이면 바꾸기가 거절된다 ― 그 표시만 풀고 한 번 더 해 본다
-		if err := os.Rename(tmp, dst); err != nil {
-			os.Remove(tmp)
-			return err
-		}
+	if err := replace(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return err
 	}
 	in.Close()
 	return os.Remove(src)

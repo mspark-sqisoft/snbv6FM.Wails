@@ -23,11 +23,21 @@ import (
 // PartSuffix 는 받는 중인 파일의 꼬리다. 크기·검사값이 맞은 뒤에만 원래 이름으로 바꾼다.
 const PartSuffix = ".snbpart"
 
-// createPart 는 dest 옆에 쓰는 중 파일을 새로 만든다. 보통은 dest+PartSuffix 이고, 그 이름이 이미 있거나 꼬리를 붙이면 파일 이름 상한(255자)을
-// 넘는 등 그 이름을 못 쓰면 짧은 임시 이름이다. 있던 파일은 사용자 것일 수 있어 지우거나 자르지 않는다.
-// ponytail: 그래서 강제 종료가 남긴 쓰는 중 파일도 치우지 않는다 ― 사용자 파일과 가릴 수 없다. 표식이 필요하면 쓰는 중 파일에 앞머리를 넣는다.
+// partPath 는 dest 를 받는 동안 쓰는 파일의 경로다. 앞머리가 있어 자동 업로드 후보에서 빠진다.
+func partPath(dest string) string {
+	return filepath.Join(filepath.Dir(dest), files.WritePrefix+filepath.Base(dest)+PartSuffix)
+}
+
+// createPart 는 dest 옆에 쓰는 중 파일을 새로 만든다. 그 이름이 이미 있으면 강제 종료가 남긴 것이라(같은 자리는 claim 이 한 번에 하나만 내주고,
+// 앞머리가 붙은 이름은 SavePath 가 받지 않는다) 지우고 새로 만든다. 앞머리·꼬리를 붙이면 파일 이름 상한(255자)을 넘는 등 그 이름을 못 쓰면 짧은 임시 이름이다.
+// ponytail: 다시 받지 않은 파일의 쓰는 중 파일은 남는다. 치워야 하면 로그인 때 받는 폴더를 훑는다.
 func createPart(dest string) (*os.File, error) {
-	f, err := os.OpenFile(dest+PartSuffix, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
+	part := partPath(dest)
+	f, err := os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
+	if errors.Is(err, os.ErrExist) {
+		os.Remove(part)
+		f, err = os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o666)
+	}
 	if err == nil {
 		return f, nil
 	}
@@ -39,7 +49,13 @@ func createPart(dest string) (*os.File, error) {
 	} else if !files.Exists(dest) { // 자리에 무엇이든 있으면(폴더 포함) 임시 이름으로 받고 commit 이 번호로 비킨다
 		return nil, err
 	}
-	if f, err = os.CreateTemp(filepath.Dir(dest), "snb*"+PartSuffix); err == nil {
+	return tempPart(dest)
+}
+
+// tempPart 는 dest 옆에 다른 쓰기와 겹치지 않는 이름의 쓰는 중 파일을 만든다.
+func tempPart(dest string) (*os.File, error) {
+	f, err := os.CreateTemp(filepath.Dir(dest), files.WritePrefix+"*"+PartSuffix)
+	if err == nil {
 		f.Chmod(0o644) // CreateTemp 는 0600 이다
 	}
 	return f, err
@@ -144,7 +160,7 @@ func clipExt(format int32, serverPath string) string {
 	return ".fmh"
 }
 
-// Receive 는 서버 파일 하나를 받는다(docs/port/04 7.4·7.6). .snbpart 에 쓰며 검사값을 함께 계산하고,
+// Receive 는 서버 파일 하나를 받는다(docs/port/04 7.4·7.6). 쓰는 중 파일에 쓰며 검사값을 함께 계산하고,
 // 크기(-977)·검사값(-45)이 맞을 때만 원래 이름으로 바꾼다. 실패·취소면 받던 파일을 지운다.
 func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp DownloadSpec, p *Progress) (*DownloadResult, error) {
 	if sp.Limits == (ExtractLimits{}) {
@@ -326,7 +342,7 @@ func Receive(ctx context.Context, c serverfile.ServerFileServiceClient, sp Downl
 	return res, nil
 }
 
-// commit 은 .snbpart 를 dest 로 바꾸고 실제 저장 경로를 돌려준다. 빈 자리이거나 덮어쓰기일 때만 그 자리에 놓고, 원래 파일을 먼저 지우지 않으므로
+// commit 은 쓰는 중 파일을 dest 로 바꾸고 실제 저장 경로를 돌려준다. 빈 자리이거나 덮어쓰기일 때만 그 자리에 놓고, 원래 파일을 먼저 지우지 않으므로
 // 바꾸기가 실패해도 원래 파일은 남는다. 받는 동안 같은 이름이 생겼거나 바꾸지 못하면 번호 붙인 이름으로 남긴다.
 // ponytail: 자리를 본 뒤 바꾸기 전에 생긴 파일은 바꿔치기된다. 막으려면 겹치면 실패하는 os.Link 로 바꾼다(FAT·일부 망 드라이브는 안 된다).
 func commit(part, dest string, overwrite bool) (string, error) {
@@ -346,7 +362,7 @@ func commit(part, dest string, overwrite bool) (string, error) {
 	return alt, nil
 }
 
-// replace 는 같은 폴더의 part 를 dest 로 바꾼다. Windows 는 읽기 전용 파일로 바꾸기를 거절한다 ― 그 표시만 풀고 한 번 더 해 보고,
+// replace 는 part 를 dest 로 바꾼다. Windows 는 읽기 전용 파일로 바꾸기를 거절한다 ― 그 표시만 풀고 한 번 더 해 보고,
 // 그래도 안 되면 표시를 되돌린다. 다른 프로그램이 dest 를 열어 둔 경우가 그렇다.
 func replace(part, dest string) error {
 	err := os.Rename(part, dest)
@@ -386,6 +402,7 @@ func placeFolder(ctx context.Context, zipPath string, sp DownloadSpec, p *Progre
 	defer release()
 	fresh := !files.Exists(dest)
 	if fresh && os.Rename(work, dest) == nil {
+		inheritACL(dest)
 		return dest, nil
 	}
 	if err := MergeDir(work, dest); err != nil {

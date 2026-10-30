@@ -35,9 +35,11 @@ type fakeServer struct {
 	serverfile.UnimplementedServerFileServiceServer
 	mu sync.Mutex
 	// 업로드
-	rejectAfter int  // >0 이면 이만큼 조각을 받은 뒤 res=-22
-	holdAfter   int  // >0 이면 이만큼 받은 뒤 더 읽지 않는다(정지·취소 시험)
-	holdCommit  bool // 끝까지 받은 뒤 완료 응답을 보내지 않는다
+	rejectAfter int   // >0 이면 이만큼 조각을 받은 뒤 res=-22
+	holdAfter   int   // >0 이면 이만큼 받은 뒤 더 읽지 않는다(정지·취소 시험)
+	holdCommit  bool  // 끝까지 받은 뒤 완료 응답을 보내지 않는다
+	commitErr   error // 끝까지 받은 뒤 이 오류로 끝낸다
+	commitRej   bool  // 끝까지 받은 뒤 res=-22
 	gotInfo     *serverfile.FileTransInfo
 	gotBytes    []byte
 	closedSend  bool // 클라이언트가 CloseSend 로 끝냈다(EOF)
@@ -67,6 +69,12 @@ func (f *fakeServer) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploa
 			if hold {
 				<-st.Context().Done()
 				return st.Context().Err()
+			}
+			if f.commitErr != nil {
+				return f.commitErr
+			}
+			if f.commitRej {
+				return st.Send(&common.AnswerResponse{Res: 0, Code: -22, Reason: "size"})
 			}
 			return st.Send(&common.AnswerResponse{Res: 1})
 		}
@@ -234,8 +242,36 @@ func TestSendCommitTimeout(t *testing.T) {
 	c := startFake(t, &fakeServer{holdCommit: true})
 	p := write(t, t.TempDir(), "a.txt", "abc")
 	err := Send(context.Background(), c, UploadSpec{Path: p, Commit: 100 * time.Millisecond, Info: &serverfile.FileTransInfo{}}, &Progress{})
-	if CodeOf(err) != CodeStall || !errors.Is(err, ErrCommitLimit) {
+	if CodeOf(err) != CodeCommitUnknown || !errors.Is(err, ErrCommitUnknown) || !strings.Contains(err.Error(), "올라갔을 수") {
 		t.Fatal(err)
+	}
+}
+
+// 끝 신호를 보낸 뒤의 실패는 서버의 답이 없으면 결과를 모른다 ― 끊겨도, 취소해도 그렇다. 서버가 실패로 답하면 실패가 확실하다.
+func TestSendCommitUnknown(t *testing.T) {
+	p := write(t, t.TempDir(), "a.txt", "abc")
+	send := func(ctx context.Context, f *fakeServer) error {
+		return Send(ctx, startFake(t, f), UploadSpec{Path: p, Info: &serverfile.FileTransInfo{}}, &Progress{})
+	}
+	for _, code := range []codes.Code{codes.Unavailable, codes.DeadlineExceeded, codes.Internal} {
+		err := send(context.Background(), &fakeServer{commitErr: status.Error(code, "끊김")})
+		if CodeOf(err) != CodeCommitUnknown || !errors.Is(err, ErrCommitUnknown) {
+			t.Fatal(code, err)
+		}
+	}
+	err := send(context.Background(), &fakeServer{commitErr: errors.New("failed to save file info to DB")})
+	if CodeOf(err) != CodeFailed || errors.Is(err, ErrCommitUnknown) {
+		t.Fatal("저장 실패", err)
+	}
+	err = send(context.Background(), &fakeServer{commitRej: true})
+	if CodeOf(err) != CodeUpBizSize || errors.Is(err, ErrCommitUnknown) {
+		t.Fatal("거절", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	err = send(ctx, &fakeServer{holdCommit: true})
+	if !errors.Is(err, ErrCanceled) || !errors.Is(err, ErrCommitUnknown) {
+		t.Fatal("취소", err)
 	}
 }
 
@@ -277,8 +313,8 @@ func TestReceiveOKAndConflictNumbering(t *testing.T) {
 	if b, _ := os.ReadFile(dest); !bytes.Equal(b, body) {
 		t.Fatal("덮어쓰지 않았다")
 	}
-	if _, err := os.Stat(dest + PartSuffix); err == nil {
-		t.Fatal(".snbpart 가 남았다")
+	if _, err := os.Stat(partPath(dest)); err == nil {
+		t.Fatal("쓰는 중 파일이 남았다")
 	}
 }
 
@@ -427,7 +463,7 @@ func TestReceiveClipChecksumFirst(t *testing.T) {
 	}
 }
 
-// 자리에 이미 있는 .snbpart 는 사용자 파일일 수 있다 ― 지우지도 자르지도 않고 임시 이름으로 받는다.
+// 앞머리가 없는 .snbpart 는 사용자 파일이다 ― 받기가 건드리지 않는다.
 func TestReceiveKeepsExistingPart(t *testing.T) {
 	body := []byte("new")
 	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
@@ -443,6 +479,22 @@ func TestReceiveKeepsExistingPart(t *testing.T) {
 	}
 	if names, _ := os.ReadDir(dir); len(names) != 2 {
 		t.Fatal("임시 파일이 남았다", names)
+	}
+}
+
+// 강제 종료가 남긴 쓰는 중 파일은 다시 받을 때 치운다 ― 재시도마다 쌓이지 않는다.
+func TestReceiveReplacesLeftoverPart(t *testing.T) {
+	body := []byte("new")
+	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "a.txt")
+	write(t, dir, filepath.Base(partPath(dest)), "잘린 내용")
+	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3}, &Progress{})
+	if err != nil || res.Path != dest {
+		t.Fatal(res, err)
+	}
+	if names, _ := os.ReadDir(dir); len(names) != 1 {
+		t.Fatal("쓰는 중 파일이 남았다", names)
 	}
 }
 
@@ -523,7 +575,7 @@ func TestReceiveNumberedIsNotOverwrite(t *testing.T) {
 	defer reserved.Delete(pathKey(dest))
 	c := startFake(t, &fakeServer{data: body, checksum: sum(body), onDown: func() {
 		for range 5000 { // 번호 자리를 잡은 뒤에 같은 이름의 파일을 만든다
-			if _, err := os.Stat(alt + PartSuffix); err == nil {
+			if _, err := os.Stat(partPath(alt)); err == nil {
 				break
 			}
 			time.Sleep(time.Millisecond)
@@ -539,16 +591,15 @@ func TestReceiveNumberedIsNotOverwrite(t *testing.T) {
 	}
 }
 
-// 자리에 폴더와 .snbpart 가 함께 있어도 받기를 시작하고 번호 이름으로 남긴다.
-func TestReceiveOverwriteDirWithPart(t *testing.T) {
+// 쓰는 중 파일 이름이 상한을 넘고 자리에 폴더가 있어도 받기를 시작하고 번호 이름으로 남긴다.
+func TestReceiveOverwriteDirLongName(t *testing.T) {
 	body := []byte("new")
 	c := startFake(t, &fakeServer{data: body, checksum: sum(body)})
-	dir := t.TempDir()
-	dest := filepath.Join(dir, "a.txt")
+	name := strings.Repeat("a", 245)
+	dest := filepath.Join(t.TempDir(), name)
 	write(t, dest, "x", "y")
-	write(t, dir, "a.txt"+PartSuffix, "mine")
 	res, err := Receive(context.Background(), c, DownloadSpec{ServerName: "S", Dest: dest, Size: 3, Overwrite: true}, &Progress{})
-	if err != nil || filepath.Base(res.Path) != "a_00000.txt" {
+	if err != nil || filepath.Base(res.Path) != name+"_00000" {
 		t.Fatal(res, err)
 	}
 }
@@ -603,6 +654,26 @@ func TestMoveFileKeepsDstWhenPartHeld(t *testing.T) {
 	}
 }
 
+// 병합은 파일마다 자리를 잡지 않으므로 같은 파일을 받는 쪽의 쓰는 중 파일을 건드리지 않는다.
+func TestMoveFileKeepsOthersPart(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows 전용")
+	}
+	dir := t.TempDir()
+	dst := write(t, dir, "d.txt", "old")
+	src := write(t, dir, "s.txt", "new")
+	other := write(t, dir, filepath.Base(partPath(dst)), "받는 중")
+	f, err := os.Open(dst) // dst 를 잡아 첫 바꾸기를 실패시켜 복사로 보낸다
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.Close() })
+	moveFile(src, dst)
+	if b, err := os.ReadFile(other); err != nil || string(b) != "받는 중" {
+		t.Fatal("받는 쪽의 쓰는 중 파일이 사라졌다", err)
+	}
+}
+
 // 꼬리를 붙이면 파일 이름 상한(255자)을 넘는 이름도 받는다.
 func TestReceiveLongName(t *testing.T) {
 	body := []byte("new")
@@ -635,6 +706,30 @@ func TestCreatePartChecksFinalName(t *testing.T) {
 	f.Close()
 	if b, _ := os.ReadFile(dst); string(b) != "old" {
 		t.Fatal("기존 파일이 바뀌었다", string(b))
+	}
+}
+
+// 바꾸지 못하면 읽기 전용 표시를 되돌린다.
+func TestMoveFileKeepsReadOnlyWhenHeld(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows 전용")
+	}
+	dir := t.TempDir()
+	dst := write(t, dir, "d.txt", "old")
+	src := write(t, dir, "s.txt", "new")
+	if err := os.Chmod(dst, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { f.Close(); os.Chmod(dst, 0o644) })
+	if err := moveFile(src, dst); err == nil {
+		t.Fatal("실패해야 한다")
+	}
+	if st, _ := os.Stat(dst); st.Mode().Perm()&0o200 != 0 {
+		t.Fatal("읽기 전용 표시가 풀렸다")
 	}
 }
 
@@ -695,13 +790,68 @@ func TestManagerCancelAfterSuccessIsDone(t *testing.T) {
 	}
 }
 
+// 끝난 행이 상한을 넘으면 실패 행보다 나머지가 먼저 사라진다 ― 창 없이 지나간 실패는 이 행이 유일한 화면 표시다.
+func TestManagerKeepsFailedRows(t *testing.T) {
+	m := NewManager(5, 0, Hooks{})
+	var finished atomic.Int32
+	add := func(run func(context.Context, *Progress) error) int64 {
+		t.Helper()
+		id, err := m.Add(Job{Dir: Up, Name: "f", Run: run, Done: func(Result) { finished.Add(1) }})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	ok := func(context.Context, *Progress) error { return nil }
+	failed := add(func(context.Context, *Progress) error { return errors.New("실패") })
+	waitFor(t, func() bool { return finished.Load() == 1 })
+	oldest := add(ok)
+	waitFor(t, func() bool { return finished.Load() == 2 })
+	for range maxFinished - 1 {
+		add(ok)
+	}
+	waitFor(t, func() bool { return finished.Load() == maxFinished+1 })
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, kept := m.runs[failed]; !kept {
+		t.Fatal("실패 행이 사라졌다")
+	}
+	if _, kept := m.runs[oldest]; kept {
+		t.Fatal("성공 행이 남았다")
+	}
+}
+
+// 끝난 행이 모두 실패여도 방금 끝난 행은 화면에 나오기 전에 사라지지 않는다.
+func TestManagerKeepsJustEnded(t *testing.T) {
+	m := NewManager(5, 0, Hooks{})
+	var finished atomic.Int32
+	done := func(Result) { finished.Add(1) }
+	for range maxFinished {
+		if _, err := m.Add(Job{Dir: Up, Name: "f", Run: func(context.Context, *Progress) error { return errors.New("실패") }, Done: done}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitFor(t, func() bool { return finished.Load() == maxFinished })
+	last, err := m.Add(Job{Dir: Up, Name: "f", Run: func(context.Context, *Progress) error { return nil }, Done: done})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return finished.Load() == maxFinished+1 })
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, kept := m.runs[last]; !kept {
+		t.Fatal("방금 끝난 행이 사라졌다")
+	}
+}
+
 // 끝난 행은 세션을 쥔 함수를 놓고, 끝난 순서로 maxFinished 를 넘는 만큼 사라진다 ― 오래 걸린 전송의 행은 끝나자마자 사라지지 않는다.
 func TestManagerReleasesFinished(t *testing.T) {
 	m := NewManager(5, 0, Hooks{})
 	var finished atomic.Int32
 	job := Job{Dir: Up, Name: "f",
-		Run:  func(context.Context, *Progress) error { return nil },
-		Done: func(Result) { finished.Add(1) }}
+		Prepare: func(context.Context, *Progress) error { return nil },
+		Run:     func(context.Context, *Progress) error { return nil },
+		Done:    func(Result) { finished.Add(1) }}
 	first, err := m.Add(job)
 	if err != nil {
 		t.Fatal(err)
@@ -709,7 +859,7 @@ func TestManagerReleasesFinished(t *testing.T) {
 	waitFor(t, func() bool { return finished.Load() == 1 })
 	m.mu.Lock()
 	r := m.runs[first]
-	released := r.job.Run == nil && r.job.Done == nil
+	released := r.job.Run == nil && r.job.Done == nil && r.job.Prepare == nil
 	m.mu.Unlock()
 	if !released {
 		t.Fatal("끝난 행이 함수를 쥐고 있다")

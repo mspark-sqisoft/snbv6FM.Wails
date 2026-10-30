@@ -42,7 +42,7 @@ type qent struct {
 // Queue 는 전송 대기열의 순수 규칙이다(원본 imports/FileMoverGrpc/TransferQueue, docs/port/03 7.2). 잠금은 부르는 쪽(Manager)이 한다.
 //   - 방향별 FIFO. 동시 상한은 그 방향의 대기·진행 중에 serialMin 보다 큰 것이 하나라도 있으면 1, 아니면 maxConc
 //     (기준과 같은 크기는 동시 ― 원본 049)
-//   - 아는 번호는 상태와 무관하게 다시 받지 않는다. 추가(원본보다 낫게): 같은 Key 가 대기·진행 중이면 거부
+//   - 아는 번호는 Forget 하기 전까지 상태와 무관하게 다시 받지 않는다. 추가(원본보다 낫게): 같은 Key 가 대기·진행 중이면 거부
 //   - Cancel 은 대기 중일 때만, Complete 는 진행 중일 때만 참(두 번 불러도 한 번만 센다)
 type Queue struct {
 	maxConc   int

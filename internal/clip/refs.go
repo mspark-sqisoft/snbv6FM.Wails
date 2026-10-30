@@ -242,8 +242,8 @@ func refValue(raw string) string {
 // fileURLPath 는 호스트 없는 file: 주소가 가리키는 이 PC 의 보통 경로다. 호스트가 있거나 보통 경로가 아니면 거짓.
 // Windows 는 UNC·장치·NT 앞머리를 하나씩 막지 않고 드라이브 경로만 남긴다(원본 plainFilePath) ― file:///%5Chost%5Cs 는 url 이 %5C 를 풀고
 // path.Clean 이 \ 를 건드리지 않아 그대로 두면 os.Open 이 UNC 로 연다. 정리하기 전과 뒤를 모두 판정한다 ― 정리가 file:///C:/../%5C%5Chost 의
-// 드라이브를 지운다.
-func fileURLPath(v string) (string, bool) {
+// 드라이브를 지우고, file:////host/s/../../C:/x 에는 드라이브를 만든다. 뒤의 값은 정리한 경로로는 안전해도 CSS 에 원문이 남아 UNC 로 읽힌다.
+func fileURLPath(v string, windows bool) (string, bool) {
 	u, err := url.Parse(v)
 	if err != nil || u.Host != "" {
 		return "", false
@@ -252,7 +252,7 @@ func fileURLPath(v string) (string, bool) {
 	if driveURLRe.MatchString(u.Path) && driveURLRe.MatchString(clean) {
 		return clean[1:], true
 	}
-	return clean, runtime.GOOS != "windows" && strings.HasPrefix(u.Path, "/")
+	return clean, !windows && strings.HasPrefix(u.Path, "/")
 }
 
 // ClassifyRef 는 보내는 쪽 그림 참조 하나를 나눈다. domain 은 복사한 페이지 주소(SourceURL).
@@ -271,7 +271,7 @@ func ClassifyRef(raw, domain, clipRoot string) Ref {
 		switch strings.ToLower(m[1]) {
 		case "file":
 			// 호스트를 단 file://host/…·file://localhost/… 는 열지 않는다
-			p, ok := fileURLPath(v)
+			p, ok := fileURLPath(v, runtime.GOOS == "windows")
 			if !ok {
 				return drop
 			}
@@ -612,7 +612,7 @@ func bundleName(raw, clipRoot string, names []string) (string, bool) {
 	}
 	v = strings.ReplaceAll(v, `\`, "/")
 	if len(v) >= 5 && strings.EqualFold(v[:5], "file:") {
-		p, ok := fileURLPath(v)
+		p, ok := fileURLPath(v, runtime.GOOS == "windows")
 		if !ok {
 			return "", false
 		}

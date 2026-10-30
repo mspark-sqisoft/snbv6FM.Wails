@@ -63,14 +63,24 @@ func HashFile(ctx context.Context, path string, p *Progress) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// ErrCommitLimit 은 다 보낸 뒤 완료 응답 상한을 넘긴 실패의 사유다. 서버에 파일이 올라갔을 수 있어 자동 업로드는 다시 올리지 않는다.
-var ErrCommitLimit = errors.New("완료 응답 상한을 넘겼다")
+// ErrCommitUnknown 은 다 보낸 뒤 서버의 답을 받지 못한 실패의 사유다. 서버는 끝 신호를 받으면 저장에 들어가고 DB 저장을 넘기면 클라이언트가 끊겨도
+// 되돌리지 않아(서버 svc_fileupload.go:295-301) 파일이 올라갔을 수 있다. 취소여도 errors.Is 로 볼 수 있다.
+var ErrCommitUnknown = errors.New("다 보냈으나 완료 응답을 받지 못했다")
+
+// serverAnswered 는 스트림 오류가 서버의 답인가다. 서버의 저장 실패는 일반 오류(Unknown)로 온다. 끊김·취소·시한 초과·전송 계층 오류는 답이 아니다.
+func serverAnswered(err error) bool {
+	switch status.Code(err) {
+	case codes.OK, codes.Unavailable, codes.Canceled, codes.DeadlineExceeded, codes.Internal:
+		return false
+	}
+	return true
+}
 
 // UploadSpec 은 보낼 파일 하나다.
 //   - Info: 첫 메시지. Fsize 는 Send 가 연 파일 크기로 채운다
 //   - Stamp: 검사 때 기준값. 영값이 아니면 첫 조각 전·끝 알림 전에 대조해 다르면 -978(원본 097)
 //   - Stall: 보낸 바이트가 이만큼 늘지 않으면 -975(0 이면 끔, fmenv UPLOAD_STALL_SEC)
-//   - Commit: 다 보낸 뒤 서버의 완료 응답을 기다리는 상한. 넘으면 -975(0 이면 끔, fmenv UPLOAD_COMMIT_SEC)
+//   - Commit: 다 보낸 뒤 서버의 완료 응답을 기다리는 상한. 넘으면 -9996(0 이면 끔, fmenv UPLOAD_COMMIT_SEC)
 //   - Limit: 서버 크기 거절(-22·-24) 문구의 %1
 type UploadSpec struct {
 	Path   string
@@ -164,7 +174,7 @@ func Send(ctx context.Context, c serverfile.ServerFileServiceClient, sp UploadSp
 			return fail(CodeStall, cause, fmt.Sprint(int(sp.Stall.Seconds())))
 		}
 		if parent.Err() != nil {
-			return ErrCanceled
+			return errors.Join(ErrCanceled, cause) // 취소여도 ErrCommitUnknown 은 남겨야 한다
 		}
 		return fail(code, cause)
 	}
@@ -212,9 +222,13 @@ func Send(ctx context.Context, c serverfile.ServerFileServiceClient, sp UploadSp
 		return verdict(CodeBroken, fmt.Errorf("보낸 %d / %d 바이트", sent, size))
 	}
 	p.Set(PhaseCommit, sent, size)
-	if err := stream.CloseSend(); err != nil {
+	// 끝 신호를 보낸 뒤로는 서버의 답이 없으면 결과를 모른다
+	unknown := func(cause error) error {
 		cancel()
-		return verdict(CodeBroken, err)
+		return verdict(CodeCommitUnknown, fmt.Errorf("%w: %w", ErrCommitUnknown, cause))
+	}
+	if err := stream.CloseSend(); err != nil {
+		return unknown(err)
 	}
 	var limit <-chan time.Time
 	if sp.Commit > 0 {
@@ -222,20 +236,17 @@ func Send(ctx context.Context, c serverfile.ServerFileServiceClient, sp UploadSp
 	}
 	select {
 	case err = <-recvDone:
-	case <-limit: // 서버는 이 응답 전에 암호화까지 하므로 파일이 올라갔을 수 있다 ― 상한을 넉넉히 둔다
-		stalled.Store(true)
-		cancel()
-		return verdict(CodeStall, ErrCommitLimit)
+	case <-limit:
+		return unknown(fmt.Errorf("상한 %s 를 넘겼다", sp.Commit))
 	}
 	if err == io.EOF {
 		err = nil
 	}
-	if rejected.Load() != nil || err != nil {
-		code := CodeFailed
-		if status.Code(err) == codes.Unavailable {
-			code = CodeBroken
-		}
-		return verdict(code, err)
+	if rejected.Load() != nil || serverAnswered(err) {
+		return verdict(CodeFailed, err)
+	}
+	if err != nil {
+		return unknown(err)
 	}
 	return nil
 }
