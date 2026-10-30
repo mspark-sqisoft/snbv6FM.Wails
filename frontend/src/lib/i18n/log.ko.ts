@@ -1,0 +1,30 @@
+// [로그] 화면 문구(알림·로그 담당 ― docs/port/09).
+const ko = {
+  table: '로그 목록',
+  date: '날짜',
+  level: '수준',
+  'level.all': '전체 수준',
+  atLeast: '이 수준 이상',
+  category: '분류',
+  'category.all': '전체 분류',
+  word: '단어',
+  wordPlaceholder: '로그에서 조회할 단어',
+  search: '조회',
+  'col.no': '#',
+  'col.time': '시간',
+  'col.level': '수준',
+  'col.account': '계정',
+  'col.category': '분류',
+  'col.message': '로그',
+  'col.file': '파일',
+  summary: '{total}줄 중 {matched}줄 · {ms}ms',
+  truncated: '맞는 줄이 많아 가장 최근 {n}줄만 보입니다.',
+  empty: '조회된 데이터가 없습니다.',
+  emptyHint: '조건을 바꿔 다시 조회해 보세요.',
+  missing: '그날의 로그 파일이 없습니다.',
+  missingOff: '[설정]의 [로그 저장]이 꺼져 있어 로그를 남기지 않습니다.',
+  failed: '로그를 읽지 못했습니다.',
+  detail: '로그 {time}',
+}
+
+export default ko

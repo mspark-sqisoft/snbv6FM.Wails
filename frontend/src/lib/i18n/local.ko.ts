@@ -1,0 +1,60 @@
+// 로컬 탐색기 문구(원문). 원본 LocalFileExplorerPanel.qml·LocalFileListModel.cpp 문구 그대로(docs/port/12 3.4).
+const ko = {
+  title: '탐색기',
+  pathPlaceholder: '폴더 경로를 입력하고 Enter',
+  path: '폴더 경로',
+  up: '상위 폴더',
+  upload: '업로드',
+  uploadTip: '선택한 파일 {files}개 / 폴더 {dirs}개를 업로드합니다.',
+  uploadNone: '업로드할 파일이나 폴더를 선택해 주세요.',
+  download: '다운로드',
+  downloadTip: '위 목록에서 선택한 서버 파일을 현재 폴더로 다운로드합니다.',
+  downloadNone: '위 서버 파일 목록에서 받을 파일을 선택해 주세요.',
+  newFolder: '새 폴더',
+  newFolderTip: '현재 폴더 아래에 새 폴더를 만듭니다.',
+  newFolderAt: '만들 위치: {path}',
+  folderName: '폴더 이름',
+  showHidden: '숨김 파일 보기',
+
+  'col.name': '이름',
+  'col.size': '크기',
+  'col.type': '유형',
+  'col.modified': '수정일',
+
+  'type.link': '바로 가기',
+  'type.folder': '폴더',
+  'type.ext': '{ext} 파일',
+  'type.file': '파일',
+
+  'tree.label': '탐색기 폴더 트리',
+  'tree.desktop': '바탕 화면',
+  'tree.documents': '내 문서',
+  'tree.computer': '내 컴퓨터',
+  'tree.drive': '로컬 디스크',
+  'tree.removable': '이동식 디스크',
+  'tree.network': '네트워크 드라이브',
+  'tree.cdrom': 'CD 드라이브',
+
+  'list.label': '탐색기 파일 목록',
+  emptyNoFolder: '폴더를 선택해 주세요.',
+  emptyFolder: '이 폴더에는 항목이 없습니다.',
+  reading: '폴더를 읽고 있습니다...',
+  status: '{n}개 항목',
+  statusSelected: '{n}개 항목 · 파일 {files}개 / 폴더 {dirs}개 선택',
+  dragLabel: '{name} 외 {n}개',
+  selectedOne: '{name} 선택됨',
+
+  'err.notFound': '폴더를 찾을 수 없습니다.',
+  'err.permission': '폴더를 읽을 권한이 없습니다.',
+  'err.noParent': '먼저 폴더를 선택해 주세요.',
+  'err.emptyName': '폴더 이름을 입력해 주세요.',
+  'err.badChars': '폴더 이름에 다음 문자는 쓸 수 없습니다.\n\\ / : * ? " < > |',
+  'err.badName': '사용할 수 없는 폴더 이름입니다.',
+  'err.exists': '같은 이름의 폴더나 파일이 이미 있습니다.',
+  'err.cannotWrite': '폴더를 만들 수 없습니다. 쓰기 권한을 확인해 주세요.',
+
+  uploadStarted: '{n}개 항목을 업로드합니다.',
+  downloadStarted: '{n}개 파일을 {path} 로 다운로드합니다.',
+}
+
+export default ko

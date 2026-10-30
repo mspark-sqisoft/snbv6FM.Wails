@@ -11,7 +11,7 @@ info:
   description: "snB 망연계 파일전송 클라이언트" # The application description
   copyright: "(c) 2026, SQIsoft" # Copyright text
   comments: "Wails 판" # Comments
-  version: "0.1.0" # The application version
+  version: "6.0.0.1" # The application version(main.go 의 version 과 같은 값 ― 빌드 때 -ldflags -X main.version 으로 바꿀 수 있다)
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

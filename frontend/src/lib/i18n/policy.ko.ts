@@ -1,0 +1,57 @@
+// 정책 영역 문구(원본 content/FileCheckResultDlg.qml·HomePage.qml 의 압축 비밀번호 창·PolicyScrollView.qml).
+const ko = {
+  // [파일 검사 결과]
+  'check.title': '파일 검사 결과',
+  'check.running': '검사가 진행중입니다.',
+  'check.allOk': '검사결과 모두 정상 파일입니다.',
+  'check.fails': '오류 파일 개수 : {n}',
+  'check.failsSkip': '오류 파일 개수 : {n} (차단 파일 {skip}건을 빼고 올립니다)',
+  'check.progress': '{done} / {total}',
+  'check.progressLabel': '검사 진행',
+  'check.ok': '확인',
+  'check.skipUpload': '차단파일 제외 업로드',
+  'check.cancel': '취소',
+  'check.table': '파일 검사 결과 목록',
+  'check.innerTitle': '내부 파일 검사 결과',
+  'check.innerTable': '내부 파일 검사 결과 목록',
+  'check.empty': '조회된 데이터가 없습니다.',
+  'col.no': '#',
+  'col.name': '파일명',
+  'col.result': '결과',
+  'col.detail': '상세',
+  'col.inner': '내부 파일',
+
+  // [압축 비밀번호 입력]
+  'zip.title': '압축 비밀번호 입력',
+  'zip.prompt': '압축 파일의 비밀번호를 입력하세요.',
+  'zip.retry': '비밀번호가 틀렸습니다. 다시 입력하세요.',
+  'zip.placeholder': '비밀번호',
+  'zip.ok': '확인',
+  'zip.cancel': '취소',
+
+  // 정책 조회 화면
+  'view.title': '정책',
+  'view.reload': '정책 받아오기',
+  'view.reloaded': '정책을 다시 받았습니다.',
+  'view.word': '조회할 단어',
+  'view.search': '조회',
+  'view.kind': '조회 유형',
+  'view.table': '정책 목록',
+  'view.empty': '조회된 데이터가 없습니다.',
+  'view.notReady': '정책을 아직 다 받지 못했습니다.',
+  'view.summary': '판정 방식 {method} · 헤더 패턴 {patt}행 · 확장자 허용 목록 {ext}행 · 압축 내부 검사 {zip}',
+  'view.on': '켜짐',
+  'view.off': '꺼짐',
+  'kind.Profile': 'Profile',
+  'kind.LinkRedirect': 'LinkRedirect',
+  'kind.Extension': 'Extension',
+  'kind.ExtProfile': 'ExtProfile',
+  'col.type': '유형',
+  'col.pname': '명칭',
+  'col.value': '값',
+  'col.desc': '설명',
+  'allow': '허용',
+  'deny': '차단',
+}
+
+export default ko

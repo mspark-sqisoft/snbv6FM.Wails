@@ -1,0 +1,1265 @@
+/*
+ * 노선도(docs/DESIGNS.md). 앱 전체가 노선 하나다: 띠의 가로 노선 → 왼쪽 메뉴의 세로 노선 → 전송 서랍의 가로 노선.
+ * 표는 그 축소판이다: 머리가 가로 노선, 체크 칸이 세로 노선, 행이 역이다.
+ * 말씨: 면과 상자 대신 굵은 선과 둥근 역. 환승역은 굵은 먹색 고리. 아직 닿지 않은 곳·못 쓰는 것은 공사 구간처럼 점선.
+ * --metro-line 은 지금 망의 노선 색, --metro-cross 는 반대편 망의 색이다(Strip.svelte 가 html 에 망을 얹는다).
+ */
+:root[data-design='metro'] {
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+  --color-bg-chrome: #f4f5f7;
+  --color-surface: #f4f5f7;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f4f5f7;
+  --color-row-alt: #f8f8fa;
+  --color-hover: rgba(17, 17, 17, 0.06);
+  --color-active: rgba(17, 17, 17, 0.12);
+  --color-selected: #f1eafc;
+  --color-selected-hover: #e4dbf8;
+  --color-border-subtle: #e6e6ea;
+  --color-border: #bcbcc2;
+  --color-border-strong: #111111;
+  --color-text: #111111;
+  --color-text-2: #38383c;
+  --color-text-3: #5c5c62;
+  --color-text-disabled: #6e6e76;
+  --color-text-on-accent: #ffffff;
+  --color-accent: #111111;
+  --color-accent-fill: #111111;
+  --color-accent-fill-hover: #38383c;
+  --color-accent-fill-active: #000000;
+  --color-accent-subtle: #f0f0f3;
+  --color-focus: #6a2fc9;
+  --color-brand: #6a2fc9;
+
+  --color-success: #007a38;
+  --color-success-subtle: #e3f6ea;
+  --color-success-border: #00a84d;
+  --color-warning: #8a5a00;
+  --color-warning-subtle: #fff3cf;
+  --color-warning-border: #f2a900;
+  --color-danger: #c40026;
+  --color-danger-subtle: #fff0f2;
+  --color-danger-border: #e6002d;
+  --color-danger-fill: #e6002d;
+  --color-danger-fill-hover: #c40026;
+  /* 청록·보라는 망 전용이다. 정보·진행 상태는 먹색이고 고리와 선 조각 모양으로 갈린다 */
+  --color-info: #38383c;
+  --color-info-subtle: #f0f0f3;
+  --color-info-border: #5c5c62;
+  --color-neutral: #5c5c62;
+  --color-neutral-subtle: #f0f0f3;
+  --color-neutral-border: #bcbcc2;
+
+  --color-net-business: #6a2fc9;
+  --color-net-business-subtle: #f1eafc;
+  --color-net-business-border: #6a2fc9;
+  --color-net-internet: #007a76;
+  --color-net-internet-subtle: #e2f6f5;
+  --color-net-internet-border: #00a5a0;
+
+  --color-scrim: rgba(17, 17, 17, 0.5);
+
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+  --ease: cubic-bezier(0.3, 0, 0.2, 1);
+
+  /* 노선 */
+  --metro-business: #6a2fc9;
+  --metro-internet: #00a5a0;
+  --metro-yellow: #f2a900;
+  --metro-red: #e6002d;
+  --metro-green: #00a84d;
+  --metro-w: 6px;
+  --metro-line: var(--metro-business);
+  --metro-cross: var(--metro-internet);
+  --metro-on-line: #ffffff;
+}
+
+:root[data-design='metro'][data-metro-net='internet'] {
+  --metro-line: var(--metro-internet);
+  --metro-cross: var(--metro-business);
+  --metro-on-line: #111111;
+  --color-selected: #e2f6f5;
+  --color-selected-hover: #c9ecea;
+  --color-focus: #007a76;
+}
+
+/* ── 머리줄: 역 입구의 먹색 간판 ─────────────────────────── */
+
+:root[data-design='metro'] #toolBar {
+  background: #111111;
+  border-bottom: 0;
+  color: #ffffff;
+}
+:root[data-design='metro'] #toolBar :focus-visible {
+  outline-color: #ffffff;
+}
+:root[data-design='metro'] #toolBar .logo .bg {
+  fill: #ffffff;
+  rx: 12px;
+}
+:root[data-design='metro'] #toolBar .logo .fg {
+  stroke: #111111;
+}
+:root[data-design='metro'] #toolBar .word {
+  color: #d6d6da;
+}
+:root[data-design='metro'] #toolBar .word b {
+  color: #ffffff;
+}
+:root[data-design='metro'] #toolBar .sep {
+  background: #5c5c62;
+}
+:root[data-design='metro'] #toolBar .badge {
+  height: 22px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #ffffff;
+  font-size: var(--fs-body);
+  font-weight: 800;
+  box-shadow: 0 3px 0 var(--metro-line);
+}
+:root[data-design='metro'] #toolBar .badge::before {
+  content: none;
+}
+:root[data-design='metro'] #toolBar .dir {
+  color: #d6d6da;
+}
+:root[data-design='metro'] #toolBar .user {
+  color: #ffffff;
+}
+:root[data-design='metro'] #toolBar .user:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+:root[data-design='metro'] #toolBar .avatar {
+  background: #ffffff;
+  color: #111111;
+}
+:root[data-design='metro'] #toolBar .ib {
+  color: #ffffff;
+}
+:root[data-design='metro'] #toolBar .ib:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+/* ── 왼쪽 메뉴: 세로 노선. 메뉴 항목이 역, 지금 화면이 환승역 ─── */
+
+/* 낮은 창에서 메뉴가 스크롤되어도 노선이 끊기지 않게 내용과 함께 움직이는 배경(local)으로 그린다 */
+:root[data-design='metro'] .side {
+  position: relative;
+  padding: 0;
+  background:
+    linear-gradient(var(--metro-line), var(--metro-line)) 23px 0 / var(--metro-w) 100% no-repeat local,
+    var(--color-bg);
+  border-right: 2px solid var(--color-text);
+}
+:root[data-design='metro'] .side ul {
+  position: relative;
+  gap: 0;
+  padding-top: var(--sp-3);
+}
+:root[data-design='metro'] .side li {
+  position: relative;
+  padding: 4px var(--sp-2) 4px 40px;
+}
+:root[data-design='metro'] .side .item {
+  z-index: 1;
+  height: 34px;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border: 3px solid transparent;
+  border-radius: 17px;
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+:root[data-design='metro'] .side .item:not(.toggle)::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  bottom: auto;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 3.5px solid var(--metro-line);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .side .item:not(.toggle):hover::before {
+  background: var(--metro-line);
+}
+:root[data-design='metro'] .side .item:hover {
+  background: var(--color-hover);
+}
+/* 포커스는 노선 색 겹선이다. 먹색 고리인 지금 화면과 헷갈리지 않는다 */
+:root[data-design='metro'] .side .item:focus-visible,
+:root[data-design='metro'] .btn:focus-visible,
+:root[data-design='metro'] .ib:focus-visible {
+  outline-width: 3px;
+  outline-offset: 2px;
+}
+:root[data-design='metro'] .side .item[aria-current='page'] {
+  background: var(--color-bg);
+  border-color: var(--color-text);
+  box-shadow: none;
+  font-weight: 800;
+}
+:root[data-design='metro'] .side .item[aria-current='page'] svg {
+  color: var(--color-text);
+}
+/* 환승: 지금 역을 반대편 망의 노선이 가로지른다 */
+:root[data-design='metro'] .side .item[aria-current='page']:not(.toggle)::before {
+  left: -28px;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border: 5px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .side li:has(.item[aria-current='page'])::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--metro-w);
+  margin-top: -3px;
+  background: var(--metro-cross);
+}
+:root[data-design='metro'] .side .item.toggle {
+  width: auto;
+  margin: var(--sp-2) var(--sp-2) var(--sp-2) 40px;
+  color: var(--color-text-3);
+  font-size: var(--fs-sm);
+}
+:root[data-design='metro'] .side.collapsed li {
+  padding: 5px 0;
+}
+:root[data-design='metro'] .side.collapsed .item {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  padding: 0;
+  border: 3.5px solid var(--metro-line);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .side.collapsed .item::before {
+  content: none;
+}
+:root[data-design='metro'] .side.collapsed .item[aria-current='page'] {
+  border: 5px solid var(--color-text);
+}
+:root[data-design='metro'] .side.collapsed .item svg {
+  width: 15px;
+  height: 15px;
+}
+:root[data-design='metro'] .side.collapsed .item.toggle {
+  margin: var(--sp-2) auto;
+  border-color: var(--color-border);
+}
+
+/* ── 화면 제목: 역명판 ─────────────────────────────────────── */
+
+:root[data-design='metro'] .page > header {
+  min-height: 60px;
+  padding: var(--sp-3) var(--sp-5) var(--sp-2);
+}
+:root[data-design='metro'] .page > header .titles {
+  align-items: center;
+  gap: 0;
+}
+/* 역명판 양쪽의 노선 조각. 눌리지 않으므로 앞뒤 역 이름은 쓰지 않는다 */
+:root[data-design='metro'] .page > header .titles::before,
+:root[data-design='metro'] .page > header .titles::after {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: var(--metro-w);
+  background: var(--metro-line);
+}
+:root[data-design='metro'] .page > header .titles::after {
+  order: 2;
+}
+:root[data-design='metro'] .page > header h1 {
+  order: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 36px;
+  padding: 0 var(--sp-4) 0 7px;
+  border: 3px solid var(--color-text);
+  border-radius: 18px;
+  background: var(--color-bg);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+:root[data-design='metro'] .page > header h1::before {
+  content: var(--metro-bullet, '') / '';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--metro-line);
+  color: var(--metro-on-line);
+  font-size: var(--fs-caption);
+  letter-spacing: 0;
+}
+:root[data-design='metro'] .page > header .titles p {
+  order: 3;
+  margin-left: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+:root[data-design='metro'] .page > header .actions {
+  gap: 6px;
+}
+:root[data-design='metro'] .shell.narrow .page > header .actions .btn {
+  padding: 0 var(--sp-2);
+}
+
+/* ── 표: 머리가 가로 노선, 체크 칸이 세로 노선, 행이 역 ─────── */
+
+:root[data-design='metro'] .page .table {
+  border: 0;
+  border-radius: 0;
+}
+:root[data-design='metro'] .page .table.over,
+:root[data-design='metro'] .page .table.file-drop-target-active {
+  box-shadow: 0 0 0 3px var(--metro-yellow);
+}
+/* 로그·정책도 다른 화면과 같은 자리에 표를 놓아 왼쪽 메뉴 옆 세로 노선이 한 줄로 이어지게 한다 */
+:root[data-design='metro'] .page .content:not(.padded) {
+  padding: 0 var(--sp-5) var(--sp-4);
+}
+/* 체크 칸이 없는 표의 노선은 첫 칸 12~16px 에 있어 체크 칸(가운데 18px)보다 4px 왼쪽이다 */
+:root[data-design='metro'] .page .dt:not(:has(> .inner > .head > .selcell)) .inner {
+  margin-left: 4px;
+}
+:root[data-design='metro'] .dt .head {
+  background: var(--color-bg);
+  border-bottom: 0;
+  box-shadow: inset 0 -4px 0 var(--metro-line);
+}
+:root[data-design='metro'] .dt .hcell {
+  padding-bottom: 4px;
+  color: var(--color-text);
+  font-weight: var(--fw-bold);
+}
+:root[data-design='metro'] .dt .hcell:not(.selcell)::before {
+  content: '';
+  position: absolute;
+  left: var(--sp-2);
+  bottom: -3px;
+  width: 10px;
+  height: 10px;
+  border: 2.5px solid var(--metro-line);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .dt .hcell.right::before {
+  left: auto;
+  right: var(--sp-2);
+}
+:root[data-design='metro'] .dt .hcell.center::before {
+  left: calc(50% - 5px);
+}
+:root[data-design='metro'] .dt .resize::after {
+  background: var(--color-border-subtle);
+}
+:root[data-design='metro'] .dt .row {
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--color-border-subtle);
+}
+:root[data-design='metro'] .dt .selcell {
+  background: linear-gradient(var(--metro-line), var(--metro-line)) center top / 4px var(--rail-h, 100%) no-repeat;
+}
+:root[data-design='metro'] .dt .row:last-child {
+  --rail-h: 50%;
+}
+/* 체크 칸이 없는 표: 첫 칸의 배경으로 같은 노선과 역을 그린다 */
+:root[data-design='metro'] .dt .hcell:first-child:not(.selcell),
+:root[data-design='metro'] .dt .row .cell:first-child:not(.selcell) {
+  background:
+    radial-gradient(circle, var(--color-bg) 0 3.5px, var(--metro-line) 4px 7px, transparent 7.5px) 6px center / 16px 16px no-repeat,
+    linear-gradient(var(--metro-line), var(--metro-line)) 12px top / 4px var(--rail-h, 100%) no-repeat;
+}
+:root[data-design='metro'] .dt .hcell:first-child:not(.selcell) {
+  background:
+    linear-gradient(var(--metro-line), var(--metro-line)) 12px top / 4px 100% no-repeat;
+}
+/* 빈 표에서는 세로 노선을 내리지 않는다 */
+:root[data-design='metro'] .dt:has(.overlay) .hcell.hcell:first-child {
+  background: none;
+}
+:root[data-design='metro'] .dt .hcell:first-child:not(.selcell, .right),
+:root[data-design='metro'] .dt .row .cell:first-child:not(.selcell, .right) {
+  padding-left: 28px;
+}
+:root[data-design='metro'] .dt .hcell:first-child:not(.selcell)::before {
+  content: none;
+}
+:root[data-design='metro'] .dt .selcell .box {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--metro-line);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .dt .row:hover .selcell .box {
+  background: var(--metro-line);
+}
+:root[data-design='metro'] .dt .selcell .box.on,
+:root[data-design='metro'] .dt .row:hover .selcell .box.on {
+  width: 18px;
+  height: 18px;
+  background: var(--color-text);
+  border-color: var(--color-text);
+}
+:root[data-design='metro'] .dt .row.sel {
+  box-shadow: inset 0 -1px 0 var(--color-selected-hover);
+}
+/* 헤드 체크(.cb)도 노선 위의 역 */
+:root[data-design='metro'] .dt .hcell.selcell .cb .box {
+  background: var(--color-bg);
+  border-color: var(--metro-line);
+}
+:root[data-design='metro'] .dt .hcell.selcell input:checked + .box,
+:root[data-design='metro'] .dt .hcell.selcell input:indeterminate + .box {
+  background: var(--color-text);
+  border-color: var(--color-text);
+}
+
+/* 상태 칩: 알약 대신 노선 조각 + 역 한 칸. 한 요소의 배경으로만 그린다 */
+:root[data-design='metro'] .chip {
+  gap: 5px;
+}
+:root[data-design='metro'] .chip .dot,
+:root[data-design='metro'] .dlg dd .dot {
+  --stub: linear-gradient(var(--dot), var(--dot)) left center / 8px 4px no-repeat;
+  --ring: radial-gradient(circle at 11px 6px, var(--inner, #ffffff) 0 2.5px, var(--dot) 3px 5.5px, transparent 6px);
+  width: 17px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--ring), var(--stub);
+  box-shadow: none;
+}
+:root[data-design='metro'] .chip.tone-success {
+  --dot: var(--metro-green);
+  --inner: var(--metro-green);
+}
+:root[data-design='metro'] .chip.tone-accent,
+:root[data-design='metro'] .chip.tone-info {
+  --dot: var(--color-text);
+}
+/* 할 수 있는 일(요청 가능 등)은 채운 역, 기다리는 일(info)·끝난 일(neutral)은 빈 고리다 */
+:root[data-design='metro'] .chip.tone-accent {
+  --inner: var(--color-text);
+}
+:root[data-design='metro'] .chip.tone-info .dot,
+:root[data-design='metro'] .chip.tone-danger .dot,
+:root[data-design='metro'] .chip.tone-neutral .dot,
+:root[data-design='metro'] .dlg dd .dot.danger {
+  --stub: repeating-linear-gradient(90deg, var(--dot) 0 2px, transparent 2px 4px) left center / 7px 4px no-repeat;
+}
+:root[data-design='metro'] .chip.tone-warning {
+  --dot: var(--metro-yellow);
+}
+:root[data-design='metro'] .chip.tone-danger,
+:root[data-design='metro'] .dlg dd .dot.danger {
+  --dot: var(--metro-red);
+  --inner: var(--metro-red);
+}
+:root[data-design='metro'] .dlg dd .dot.success {
+  --dot: var(--metro-green);
+  --inner: var(--metro-green);
+}
+:root[data-design='metro'] .chip.tone-neutral {
+  --dot: var(--color-text-3);
+}
+
+/* 꼬리표: 알약 대신 작은 역 + 글자 */
+:root[data-design='metro'] .badge {
+  gap: 5px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: var(--fw-bold);
+}
+:root[data-design='metro'] .badge::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2.5px solid var(--tone-border);
+  border-radius: 50%;
+}
+/* 표 안의 작은 꼬리표도 표 본문 크기로 읽힌다 */
+:root[data-design='metro'] .dt .badge.sm {
+  height: 22px;
+  font-size: var(--fs-body);
+}
+
+/* ── 단추: 지도의 환승 캡슐. 주 단추는 노선 표지처럼 앞에 흰 원 ── */
+
+:root[data-design='metro'] .btn {
+  padding: 0 10px;
+  gap: 6px;
+  border: 2px solid var(--color-text);
+  border-radius: 16px;
+  font-weight: var(--fw-semibold);
+}
+:root[data-design='metro'] .btn.sm {
+  border-radius: 13px;
+}
+:root[data-design='metro'] .btn.lg {
+  border-radius: 20px;
+}
+:root[data-design='metro'] .btn.primary:has(> svg) {
+  padding-left: 3px;
+}
+:root[data-design='metro'] .btn.primary.lg {
+  padding-left: var(--sp-4);
+}
+:root[data-design='metro'] .btn.primary > svg {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  padding: 4px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111111;
+}
+:root[data-design='metro'] .btn.secondary {
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .btn.secondary:hover:not(:disabled) {
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
+}
+:root[data-design='metro'] .btn.danger {
+  border-color: var(--color-danger-fill);
+}
+:root[data-design='metro'] .btn.ghost {
+  border-color: transparent;
+}
+/* 못 쓰는 단추는 공사 구간 */
+:root[data-design='metro'] .btn:disabled {
+  border: 2px dashed var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+:root[data-design='metro'] .btn.primary:disabled > svg {
+  background: var(--color-surface);
+  color: var(--color-text-disabled);
+}
+:root[data-design='metro'] .ib {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  color: var(--color-text);
+}
+:root[data-design='metro'] .ib:hover:not(:disabled) {
+  background: var(--color-bg);
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+:root[data-design='metro'] .ib[aria-pressed='true'],
+:root[data-design='metro'] .ib[aria-pressed='true']:hover:not(:disabled) {
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
+}
+:root[data-design='metro'] .ib:disabled {
+  border: 2px dashed var(--color-border);
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+
+/* ── 입력 칸: 두 역 사이의 선로 위에 글자가 놓인다 ──────────── */
+
+/* 평상시에는 표 머리 노선보다 가볍다. 포커스·오류 때만 굵어진다 */
+:root[data-design='metro'] .field .box {
+  --rail: var(--color-text-3);
+  position: relative;
+  border: 0;
+  border-bottom: 2px solid var(--rail);
+  border-radius: 0;
+  background: none;
+}
+:root[data-design='metro'] .field .box::before,
+:root[data-design='metro'] .field .box::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--rail);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .field .box::before {
+  left: -2px;
+}
+:root[data-design='metro'] .field .box::after {
+  right: -2px;
+}
+:root[data-design='metro'] .field .box:hover:not(.disabled, .invalid, :focus-within) {
+  --rail: var(--color-text);
+}
+/* 공용 .box:hover 의 테두리 색이 포커스·오류 색을 덮지 않게 한다 */
+:root[data-design='metro'] .field .box:hover:not(.disabled) {
+  border-color: var(--rail);
+}
+:root[data-design='metro'] .field .box:focus-within {
+  --rail: var(--color-focus);
+}
+:root[data-design='metro'] .field .box.invalid {
+  --rail: var(--metro-red);
+}
+/* 칸 높이가 흔들리지 않게 굵어지는 2px 는 그림자로 그린다 */
+:root[data-design='metro'] .field .box:focus-within,
+:root[data-design='metro'] .field .box.invalid {
+  box-shadow: 0 2px 0 var(--rail);
+}
+:root[data-design='metro'] .field .box:focus-within::before,
+:root[data-design='metro'] .field .box:focus-within::after,
+:root[data-design='metro'] .field .box.invalid::before,
+:root[data-design='metro'] .field .box.invalid::after {
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  border-width: 3px;
+}
+:root[data-design='metro'] .field .box:focus-within::before,
+:root[data-design='metro'] .field .box:focus-within::after {
+  background: var(--rail);
+}
+:root[data-design='metro'] .field .box.disabled {
+  --rail: var(--color-border);
+  border-bottom-style: dashed;
+  opacity: 1;
+}
+/* 기본 지우기 단추는 브라우저 파랑이라 먹색 × 로 다시 그린다 */
+:root[data-design='metro'] input[type='search']::-webkit-search-cancel-button {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  background:
+    linear-gradient(45deg, transparent 46%, var(--color-text-2) 46% 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, var(--color-text-2) 46% 54%, transparent 54%);
+  cursor: pointer;
+}
+/* 조회 줄의 칸 사이에는 역 점이 맞닿지 않을 만큼 띄운다 */
+:root[data-design='metro'] .page .toolbar,
+:root[data-design='metro'] .page .toolbar .bar,
+:root[data-design='metro'] .page .toolbar .filters {
+  gap: var(--sp-3);
+}
+:root[data-design='metro'] .page .toolbar {
+  padding-bottom: var(--sp-3);
+}
+:root[data-design='metro'] .field .label,
+:root[data-design='metro'] fieldset > legend.label {
+  color: var(--color-text);
+  font-weight: var(--fw-bold);
+}
+:root[data-design='metro'] .field select {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+:root[data-design='metro'] .field select:hover:not(:disabled),
+:root[data-design='metro'] .field select:focus-visible {
+  box-shadow: none;
+}
+:root[data-design='metro'] .field .box:has(select:disabled) {
+  --rail: var(--color-border);
+  border-bottom-style: dashed;
+}
+:root[data-design='metro'] .field select:disabled {
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+:root[data-design='metro'] .field .box .chev {
+  color: var(--color-text);
+}
+
+/* 체크 칸은 라디오와 구분되게 각진 표지판, 표 안의 것만 둥근 역이다 */
+:root[data-design='metro'] .cb .box {
+  border: 3px solid var(--color-text);
+  border-radius: 5px;
+}
+:root[data-design='metro'] .dt .hcell.selcell .cb .box {
+  border-radius: 50%;
+}
+:root[data-design='metro'] .sw .track {
+  height: 18px;
+  border-radius: 0;
+  background: linear-gradient(var(--color-border), var(--color-border)) center / 100% 6px no-repeat;
+}
+:root[data-design='metro'] .sw .thumb {
+  top: 1px;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border: 3.5px solid var(--color-text-3);
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .sw [aria-checked='true'] .track,
+:root[data-design='metro'] .sw[aria-checked='true'] .track {
+  background-image: linear-gradient(var(--metro-line), var(--metro-line));
+}
+:root[data-design='metro'] .sw[aria-checked='true'] .thumb {
+  border: 5px solid var(--color-text);
+  transform: translateX(16px);
+}
+:root[data-design='metro'] .opt input {
+  appearance: none;
+  border: 3px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .opt input:checked {
+  background: var(--color-text);
+  box-shadow: inset 0 0 0 2.5px var(--color-bg);
+}
+
+/* ── 진행 막대: 선 위에 정거장 점. 점은 막대 폭의 25% 마다 찍힌다 ── */
+
+:root[data-design='metro'] [role='progressbar'] {
+  --stop-r: 5px;
+  --rail: 5px;
+  container-type: inline-size;
+  height: 14px;
+  padding: 0 6px;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+:root[data-design='metro'] [role='progressbar'].sm {
+  --stop-r: 4px;
+  --rail: 3px;
+  height: 12px;
+}
+:root[data-design='metro'] [role='progressbar']::before,
+:root[data-design='metro'] [role='progressbar'] .fill {
+  --stops: radial-gradient(
+      circle,
+      #ffffff 0 calc(var(--stop-r) - 2.5px),
+      var(--stop-line) calc(var(--stop-r) - 2px) var(--stop-r),
+      transparent calc(var(--stop-r) + 0.5px)
+    )
+    calc(6px - 12.5cqw) center / 25cqw 100% repeat-x;
+  background: var(--stops), linear-gradient(var(--stop-line), var(--stop-line)) center / 100% var(--rail) no-repeat;
+}
+:root[data-design='metro'] [role='progressbar']::before {
+  --stop-line: var(--color-border);
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+:root[data-design='metro'] [role='progressbar'] .fill {
+  --stop-line: var(--fill);
+  position: relative;
+  box-sizing: content-box;
+  margin-left: -6px;
+  padding-left: 6px;
+  border-radius: 0;
+  transition: none;
+}
+:root[data-design='metro'] [role='progressbar'].accent {
+  --fill: var(--metro-line);
+}
+:root[data-design='metro'] [role='progressbar'].indeterminate {
+  overflow: hidden;
+}
+:root[data-design='metro'] [role='progressbar'].indeterminate .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  margin: 0;
+  padding: 0;
+  width: 35%;
+  background: linear-gradient(var(--fill), var(--fill)) center / 100% var(--rail) no-repeat;
+  animation: metro-run 1.1s linear infinite;
+}
+:root[data-design='metro'] .busy [role='progressbar'] {
+  height: 3px;
+  padding: 0;
+}
+:root[data-design='metro'] .busy [role='progressbar']::before {
+  content: none;
+}
+@keyframes metro-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(286%);
+  }
+}
+
+/* ── 전송 서랍: 세로 노선이 내려와 가로로 꺾이는 곳 ──────────── */
+
+:root[data-design='metro'] .drawer {
+  border-top: var(--metro-w) solid var(--metro-line);
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .drawer.open {
+  box-shadow: none;
+}
+:root[data-design='metro'] .drawer > header {
+  position: relative;
+  padding-left: 46px;
+}
+:root[data-design='metro'] .drawer > header::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: -14px;
+  width: 22px;
+  height: 22px;
+  border: 5px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+/* 펼치면 노선이 환승역에서 서랍 표의 세로 노선으로 그대로 내려간다 */
+:root[data-design='metro'] .drawer.open:has(.dt) > header::after {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--metro-line);
+}
+:root[data-design='metro'] .drawer > header .title {
+  font-size: var(--fs-body);
+  font-weight: 800;
+}
+:root[data-design='metro'] .drawer > .body {
+  border-top: 0;
+}
+:root[data-design='metro'] .drawer .dt .inner {
+  margin-left: 12px;
+}
+:root[data-design='metro'] .drawer .grip {
+  top: -6px;
+}
+
+/* 탐색기: 상자를 벗기고 위쪽 손잡이만 남긴다 */
+:root[data-design='metro'] .explorer .local {
+  border: 0;
+  border-radius: 0;
+}
+:root[data-design='metro'] .explorer .local .bar {
+  border-bottom: 3px dotted var(--color-border);
+  background: none;
+}
+:root[data-design='metro'] .tree .node {
+  border-radius: 13px;
+}
+:root[data-design='metro'] .split > .grip::after {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-text);
+}
+:root[data-design='metro'] .split > .grip:hover::after,
+:root[data-design='metro'] .split > .grip:focus-visible::after {
+  background: var(--metro-line);
+}
+
+/* ── 대화상자·메뉴·알림: 고리 노선 ─────────────────────────── */
+
+:root[data-design='metro'] .dlg {
+  border: 5px solid var(--metro-line);
+  border-radius: var(--r-xl);
+  overflow: visible;
+}
+/* 서버 파일 삭제·반려처럼 되돌리기 어려운 창은 빨간 고리다 */
+:root[data-design='metro'] .dlg:has(footer .btn.danger) {
+  border-color: var(--metro-red);
+}
+/* 고리 노선 위의 환승역 */
+:root[data-design='metro'] .dlg[open]::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: -14px;
+  width: 22px;
+  height: 22px;
+  border: 5px solid var(--color-text);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .dlg > header {
+  padding: var(--sp-5) var(--sp-3) var(--sp-2) var(--sp-6);
+}
+:root[data-design='metro'] .dlg > .body {
+  padding-left: var(--sp-6);
+  padding-right: var(--sp-6);
+}
+:root[data-design='metro'] .dlg > header h2 {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+:root[data-design='metro'] .dlg > footer {
+  padding: var(--sp-2) var(--sp-6) var(--sp-5);
+  border-top: 0;
+  background: none;
+}
+:root[data-design='metro'] .dlg section h3 {
+  border-bottom: 3px dotted var(--color-border);
+}
+/* 제목 줄이 flex 인 묶음은 글자 폭이 아니라 줄 전체에 점선을 긋는다 */
+:root[data-design='metro'] .dlg section .head {
+  border-bottom: 3px dotted var(--color-border);
+}
+:root[data-design='metro'] .dlg section .head h3 {
+  border-bottom: 0;
+}
+/* 결재자 선택 창: 회색 면과 상자를 벗기고 점선으로 나눈다 */
+:root[data-design='metro'] .dlg .tree,
+:root[data-design='metro'] .dlg .files {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+:root[data-design='metro'] .dlg .tree {
+  padding: 0;
+}
+:root[data-design='metro'] .dlg .files {
+  border-top: 3px dotted var(--color-border);
+}
+/* 작은 표는 스크롤바 자리를 비워 두지 않아야 머리 노선이 창 폭 끝까지 간다 */
+:root[data-design='metro'] .dlg .dt {
+  scrollbar-gutter: auto;
+}
+/* 먹색 머리줄에 붙어도 경계가 보이게 흰 테두리를 두른다 */
+:root[data-design='metro'] .tip {
+  border: 2px solid #ffffff;
+  background: #111111;
+  color: #ffffff;
+}
+:root[data-design='metro'] .menu {
+  padding: var(--sp-2);
+  border: 3px solid var(--color-text);
+  border-radius: var(--r-lg);
+}
+:root[data-design='metro'] .menu button {
+  border-radius: 15px;
+}
+:root[data-design='metro'] .menu button:hover:not(:disabled),
+:root[data-design='metro'] .menu button:focus-visible {
+  background: #111111;
+  color: #ffffff;
+}
+:root[data-design='metro'] .menu button:hover:not(:disabled) .ico,
+:root[data-design='metro'] .menu button:focus-visible .ico,
+:root[data-design='metro'] .menu button:hover:not(:disabled) .hint,
+:root[data-design='metro'] .menu button:focus-visible .hint {
+  color: #ffffff;
+}
+:root[data-design='metro'] .menu .sep {
+  height: 0;
+  border-top: 3px dotted var(--color-border);
+  background: none;
+}
+:root[data-design='metro'] .toast {
+  border: 3px solid var(--tone-border);
+  border-radius: var(--r-lg);
+}
+
+/* 안내 줄: 면과 상자 대신 위쪽 점선 */
+:root[data-design='metro'] .page .content p.note {
+  padding: var(--sp-1) 0 0;
+  border: 0;
+  border-top: 3px dotted var(--color-border);
+  border-radius: 0;
+  background: none;
+}
+
+/* ── 빈 화면: 아직 다니지 않는 구간의 역 하나 ────────────────── */
+
+:root[data-design='metro'] .empty .icon {
+  position: relative;
+  border: 5px solid var(--color-text);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+:root[data-design='metro'] .empty .icon::before,
+:root[data-design='metro'] .empty .icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 96px;
+  margin-top: -2.5px;
+  border-top: 5px dashed var(--color-border);
+}
+:root[data-design='metro'] .empty .icon::before {
+  right: calc(100% + 8px);
+}
+:root[data-design='metro'] .empty .icon::after {
+  left: calc(100% + 8px);
+}
+
+/* ── 설정: 상자 대신 노선 한 줄에 매달린 묶음 ──────────────────── */
+
+/* 첫 묶음의 역 고리가 스크롤 칸 위로 잘리지 않게 내려 둔다 */
+:root[data-design='metro'] .scroll > .grid {
+  padding-top: 10px;
+}
+:root[data-design='metro'] .grid > .card,
+:root[data-design='metro'] .wrap > .card {
+  position: relative;
+  padding: var(--sp-3) 0 var(--sp-2);
+  border: 0;
+  border-top: 4px solid var(--metro-line);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+:root[data-design='metro'] .grid > .card h2,
+:root[data-design='metro'] .wrap > .card h2 {
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+:root[data-design='metro'] .grid > .card::before,
+:root[data-design='metro'] .wrap > .card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -9px;
+  width: 14px;
+  height: 14px;
+  border: 3.5px solid var(--metro-line);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+/* 대리결재자 화면의 날짜 칸은 공용 Input 이 아니라서 같은 선로로 맞춘다 */
+:root[data-design='metro'] .wrap > .card .date {
+  position: relative;
+}
+:root[data-design='metro'] .wrap > .card .date > span {
+  color: var(--color-text);
+  font-weight: var(--fw-bold);
+}
+:root[data-design='metro'] .wrap > .card .date input {
+  border: 0;
+  border-bottom: 2px solid var(--color-text-3);
+  border-radius: 0;
+  background: none;
+}
+:root[data-design='metro'] .wrap > .card .date input:focus-visible {
+  border-bottom-color: var(--color-focus);
+  box-shadow: 0 2px 0 var(--color-focus);
+  outline: none;
+}
+:root[data-design='metro'] .wrap > .card .date::before,
+:root[data-design='metro'] .wrap > .card .date::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--color-text-3);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .wrap > .card .date::before {
+  left: -2px;
+}
+:root[data-design='metro'] .wrap > .card .date::after {
+  right: -2px;
+}
+:root[data-design='metro'] .wrap > .card .date:has(input:focus-visible)::before,
+:root[data-design='metro'] .wrap > .card .date:has(input:focus-visible)::after {
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--color-focus);
+  background: var(--color-focus);
+}
+:root[data-design='metro'] .picker .item {
+  border: 2px solid var(--color-border);
+  border-radius: var(--r-lg);
+}
+:root[data-design='metro'] .picker .item.on {
+  border: 4px solid var(--color-text);
+  box-shadow: none;
+}
+/* 색 미리보기: 노선 한 줄 위의 역 네 개 */
+:root[data-design='metro'] .picker .swatch {
+  position: relative;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+:root[data-design='metro'] .picker .swatch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--color-text);
+}
+:root[data-design='metro'] .picker .swatch i {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-text);
+  border-radius: 50%;
+}
+
+/* ── 로그인: 왼쪽 전체가 노선도 ────────────────────────────── */
+
+/* 카드가 창 높이에 묶이면 낮은 창에서 로그인 단추가 잘린다. 내용만큼 자라고 .login 이 스크롤한다 */
+:root[data-design='metro'] .login {
+  padding: 0;
+  background: var(--color-bg);
+  align-items: flex-start;
+  justify-content: stretch;
+}
+/* 로그인 전에는 띠가 없으므로 고른 망이 노선 색을 정한다 */
+:root[data-design='metro'] .login:has(.net.on .dot:not(.biz)) {
+  --metro-line: var(--metro-internet);
+  --color-focus: #007a76;
+}
+:root[data-design='metro'] .login .corner {
+  z-index: 2; /* .form 이 쌓임을 만들어도 단추가 눌리게 */
+}
+:root[data-design='metro'] .login .card {
+  flex: 1;
+  min-height: 100%;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+:root[data-design='metro'] .login .brand {
+  position: relative;
+  padding: var(--sp-5) var(--sp-6);
+  background: none;
+  border-right: 0;
+  overflow: hidden;
+}
+:root[data-design='metro'] .login .brand .logo .bg {
+  rx: 12px;
+}
+:root[data-design='metro'] .login .brand > :not(.art) {
+  position: relative;
+  z-index: 1;
+}
+:root[data-design='metro'] .login .brand .ver {
+  margin-top: auto;
+}
+:root[data-design='metro'] .login .art {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+:root[data-design='metro'] .login .form {
+  position: relative;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-8);
+  border-left: 4px solid var(--color-text);
+}
+/* 제목도 역명판: 왼쪽 경계선에서 노선이 들어온다 */
+:root[data-design='metro'] .login .form h1 {
+  position: relative;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  margin-left: 0;
+  padding: 0 var(--sp-5);
+  border: 3px solid var(--color-text);
+  border-radius: 20px;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+:root[data-design='metro'] .login .form h1::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 35px;
+  height: var(--metro-w);
+  margin-top: -3px;
+  margin-right: 3px;
+  background: var(--metro-line);
+}
+:root[data-design='metro'] .login .net {
+  border: 2px solid var(--color-border);
+  border-radius: 20px;
+}
+:root[data-design='metro'] .login .net.on {
+  border: 3px solid var(--color-text);
+  background: var(--color-bg);
+  box-shadow: none;
+}
+:root[data-design='metro'] .login .net .dot {
+  width: 14px;
+  height: 14px;
+  border: 3.5px solid var(--metro-internet);
+  background: var(--color-bg);
+}
+:root[data-design='metro'] .login .net .dot.biz {
+  border-color: var(--metro-business);
+}
+:root[data-design='metro'] .login .net.on .dot {
+  background: var(--metro-internet);
+}
+:root[data-design='metro'] .login .net.on .dot.biz {
+  background: var(--metro-business);
+}
+:root[data-design='metro'] .login .error {
+  border-radius: var(--r-md);
+}
+:root[data-design='metro'] .login .error.shown {
+  border: 2px solid var(--metro-red);
+  background: var(--color-bg);
+}
+/* 왼쪽 그림이 없어지는 폭: 폼이 창 전체를 쓰고 경계선과 노선 조각도 함께 없앤다 */
+@media (max-width: 760px) {
+  :root[data-design='metro'] .login .card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root[data-design='metro'] .login .form {
+    border-left: 0;
+  }
+  :root[data-design='metro'] .login .form h1::before {
+    content: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design='metro'] [role='progressbar'].indeterminate .fill {
+    animation: none;
+  }
+}

@@ -1,0 +1,24 @@
+/* 디자인 묶음. tokens.css 뒤에 읽힌다. 글꼴은 쓰는 글자의 조각만 내려받으므로 고르지 않은 디자인의 글꼴은 읽지 않는다. */
+/* @import 는 모든 규칙보다 앞에 둔다. @font-face 뒤에 있으면 브라우저가 버린다. */
+@import '@fontsource/gowun-batang/700.css';
+@import '@fontsource/black-han-sans/400.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import './airlock/design.css';
+@import './gongmun/design.css';
+@import './departure/design.css';
+@import './waybill/design.css';
+@import './metro/design.css';
+
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('galmuri/dist/Galmuri11.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('galmuri/dist/Galmuri11-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}

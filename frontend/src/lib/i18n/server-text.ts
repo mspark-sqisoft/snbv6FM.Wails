@@ -1,0 +1,33 @@
+// Go 가 표 칸에 넣어 보내는 고정 상태 글자의 영어(원본 lang/lang_en.ts 그대로). 파일 이름이 *.en.ts 가 아니라 t() 목록에 섞이지 않는다.
+const en: Record<string, string> = {
+  '백신체크 실패': 'Antivirus scan failed',
+  '바이러스 체크 중': 'Checking for viruses',
+  '바이러스 발견': 'Virus discovered',
+  'APT 탐지중': 'Detecting APT',
+  '다운로드 불가': 'Download not possible',
+  'OLE 검출 파일 차단': 'File blocked: OLE object detected',
+  'CDR 있음': 'CDR detection',
+  '암호설정문서파일 차단': 'Block password setting document file',
+  '개인정보 검색 실패': 'Personal information retrieval failed',
+  '개인정보 검색 중': 'Searching for personal information',
+  '개인정보 검색됨': 'Personal information found',
+  '결재 대기중': 'Waiting for approval',
+  '반려됨': 'Rejected',
+  '결재요청 가능': 'Approval can be requested',
+  '다운로드 가능': 'Available for download',
+  '동일망 다운로드 불가': 'Same network download not possible',
+  '결재 요청': 'Request for approval',
+  '결재 승인': 'Approval',
+  '결재 반려': 'Rejection',
+  '사후 승인': 'Post approval',
+  '자동 결재': 'Automatic Approval',
+  '사전 결재': 'Pre-approval',
+  '확장자결재': 'Extension approval',
+  '사후 결재': 'Post-approval',
+  '요청시 사전사후결정': 'Pre- and post-determination upon request',
+  '요청시 결재생략결정': 'Decision to omit approval upon request',
+  '자동자가결재': 'Automatic self-approval',
+  '자동,사전,사후': 'Auto, pre, post',
+}
+
+export default en

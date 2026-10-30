@@ -1,0 +1,859 @@
+/* 공문(docs/DESIGNS.md): 한지 기안 용지와 붉은 인주. 왼쪽 메뉴는 문서철 색인 탭, 표는 세로 괘선·이중 머리선의 용지, 상태는 기운 인장이다. */
+:root[data-design='gongmun'] {
+  color-scheme: light;
+
+  --color-bg: #f6f1e4;
+  --color-bg-chrome: #e7ddc6;
+  --color-surface: #ece4d1;
+  --color-surface-raised: #fffdf6;
+  --color-surface-sunken: #f0e9d8;
+  --color-row-alt: #f1ebdc;
+  --color-hover: rgba(31, 58, 95, 0.07);
+  --color-active: rgba(31, 58, 95, 0.14);
+  --color-selected: #f0e3b6;
+  --color-selected-hover: #e9d9a2;
+  --color-border-subtle: #d8cdb5;
+  --color-border: #b5a78b;
+  --color-border-strong: #5a5044;
+  --color-text: #1f1b16;
+  --color-text-2: #453e33;
+  --color-text-3: #5a5143;
+  --color-text-disabled: #6e6353;
+  --color-text-on-accent: #fffdf6;
+  --color-accent: #1f3a5f;
+  --color-accent-fill: #1f3a5f;
+  --color-accent-fill-hover: #2c4d78;
+  --color-accent-fill-active: #152a47;
+  --color-accent-subtle: #dfe3e3;
+  --color-focus: #1f3a5f;
+  --color-brand: #b3261e;
+
+  --color-success: #1f3a5f;
+  --color-success-subtle: #dfe3e3;
+  --color-success-border: #8496ad;
+  --color-warning: #7a4a00;
+  --color-warning-subtle: #f4e5c2;
+  --color-warning-border: #c49c55;
+  --color-danger: #b3261e;
+  --color-danger-subtle: #f8e4dc;
+  --color-danger-border: #dc9c90;
+  --color-danger-fill: #b3261e;
+  --color-danger-fill-hover: #8f1d17;
+  --color-info: #47525c;
+  --color-info-subtle: #e6e4dc;
+  --color-info-border: #a7acac;
+  --color-neutral: #5a5143;
+  --color-neutral-subtle: #ece4d1;
+  --color-neutral-border: #b5a78b;
+
+  --color-net-business: #5f2a6b;
+  --color-net-business-subtle: #eee2ec;
+  --color-net-business-border: #5f2a6b;
+  --color-net-internet: #0d5a54;
+  --color-net-internet-subtle: #e0e7da;
+  --color-net-internet-border: #0d5a54;
+
+  --color-scrim: rgba(31, 27, 22, 0.45);
+
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-xl: 0;
+  --r-full: 0;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+  --dur-fast: 80ms;
+  --dur: 120ms;
+  --dur-slow: 180ms;
+
+  --gm-serif: 'Gowun Batang', 'Batang', 'AppleMyungjo', serif;
+  --gm-box-w: 174px;
+  --gm-tilt: -1deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design='gongmun'] {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}
+
+/* ── 틀 ─ 머리줄과 표지 ──────────────────────────────── */
+:root[data-design='gongmun'] .shell {
+  position: relative;
+}
+:root[data-design='gongmun'] .shell.narrow {
+  --gm-box-w: 136px;
+}
+:root[data-design='gongmun'] #toolBar {
+  padding-right: calc(var(--gm-box-w) + var(--sp-2));
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-text);
+}
+:root[data-design='gongmun'] #toolBar .sep {
+  background: var(--color-text);
+}
+:root[data-design='gongmun'] #toolBar .dir {
+  color: var(--color-text-2);
+}
+:root[data-design='gongmun'] :is(#toolBar, .dlg) .avatar {
+  border: 1.5px solid var(--color-text);
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text);
+  font-family: var(--gm-serif);
+  transform: rotate(-8deg);
+}
+:root[data-design='gongmun'] .logo .bg {
+  rx: 0;
+  fill: var(--color-danger-fill);
+}
+:root[data-design='gongmun'] .logo .word {
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.02em;
+}
+:root[data-design='gongmun'] .badge {
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+}
+/* 표 안은 본문 글꼴 */
+:root[data-design='gongmun'] .dt .badge {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0;
+}
+
+/* ── 왼쪽 메뉴 ─ 문서철 색인 탭 ───────────────────────── */
+:root[data-design='gongmun'] .side {
+  padding: var(--sp-3) 0 var(--sp-2) var(--sp-2);
+  border-right: 0;
+  background:
+    linear-gradient(var(--color-text), var(--color-text)) right / 1px 100% no-repeat,
+    var(--color-bg-chrome);
+  counter-reset: gm-tab;
+}
+:root[data-design='gongmun'] .side ul {
+  gap: var(--sp-1);
+}
+:root[data-design='gongmun'] .side li {
+  counter-increment: gm-tab;
+}
+:root[data-design='gongmun'] .side li .item {
+  --gm-fill: var(--color-surface);
+  --gm-line: var(--color-border);
+  --gm-spine: var(--color-text);
+  gap: var(--sp-2);
+  width: calc(100% - 8px);
+  height: 36px;
+  margin-left: 8px;
+  padding: 0 var(--sp-3) 0 var(--sp-3);
+  border-top: 1px solid var(--gm-line);
+  border-bottom: 1px solid var(--gm-line);
+  background:
+    linear-gradient(var(--gm-spine), var(--gm-spine)) right / 1px 100% no-repeat,
+    linear-gradient(var(--gm-line), var(--gm-line)) left / 1px 100% no-repeat,
+    linear-gradient(135deg, transparent 5.2px, var(--gm-line) 5.2px 6.2px, var(--gm-fill) 6.2px) top left / 100% 50% no-repeat,
+    linear-gradient(45deg, transparent 5.2px, var(--gm-line) 5.2px 6.2px, var(--gm-fill) 6.2px) bottom left / 100% 50% no-repeat;
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+  color: var(--color-text-2);
+}
+:root[data-design='gongmun'] .side li .item:hover {
+  --gm-fill: var(--color-surface-sunken);
+  color: var(--color-text);
+}
+:root[data-design='gongmun'] .side li .item:focus-visible {
+  outline-offset: -4px;
+}
+:root[data-design='gongmun'] .side li .item[aria-current='page'] {
+  --gm-fill: var(--color-bg);
+  --gm-line: var(--color-text);
+  --gm-spine: transparent; /* 철 등의 세로선은 지금 탭에서만 열려 용지와 이어진다 */
+  width: 100%;
+  margin-left: 0;
+  color: var(--color-text);
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.06em;
+}
+:root[data-design='gongmun'] .side li .item::before {
+  content: counter(gm-tab, hangul) / '';
+  position: static;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border: 1px solid var(--color-border-strong);
+  background: none;
+  color: var(--color-text-2);
+  font-family: var(--gm-serif);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0;
+}
+:root[data-design='gongmun'][lang='en'] .side li .item::before {
+  content: counter(gm-tab, upper-alpha) / '';
+}
+:root[data-design='gongmun'] .side li .item[aria-current='page']::before {
+  border-color: var(--color-danger-fill);
+  background: var(--color-danger-fill);
+  color: var(--color-text-on-accent);
+}
+:root[data-design='gongmun'] .side li .item svg {
+  order: 2;
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+  color: var(--color-text-3);
+}
+:root[data-design='gongmun'] .side li .item[aria-current='page'] svg {
+  color: var(--color-text);
+}
+/* 접힌 메뉴: 글자가 없으니 아이콘만 남긴 짧은 탭 */
+:root[data-design='gongmun'] .side.collapsed {
+  padding-left: var(--sp-1);
+}
+:root[data-design='gongmun'] .side.collapsed li .item {
+  width: calc(100% - 6px);
+  margin-left: 6px;
+  padding: 0;
+}
+:root[data-design='gongmun'] .side.collapsed li .item[aria-current='page'] {
+  width: 100%;
+  margin-left: 0;
+}
+:root[data-design='gongmun'] .side.collapsed li .item::before {
+  content: none;
+}
+:root[data-design='gongmun'] .side.collapsed li .item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  height: auto;
+  margin: 0;
+  border: 0;
+}
+:root[data-design='gongmun'] .side.collapsed li .item svg {
+  margin-left: 0;
+}
+:root[data-design='gongmun'] .side .toggle {
+  width: calc(100% - 8px);
+  margin-right: 8px;
+  color: var(--color-text-2);
+}
+
+/* ── 용지 ─ 철 구멍과 화면 제목. 구멍은 뚫린 자리라 면만 있고, 위에서 잰 값이라 서랍을 열어도 표 머리선 옆으로 옮겨 가지 않는다 ── */
+:root[data-design='gongmun'] main.content {
+  background:
+    radial-gradient(circle at 10px 210px, var(--color-border) 3.8px, transparent 4.2px),
+    radial-gradient(circle at 10px 430px, var(--color-border) 3.8px, transparent 4.2px),
+    var(--color-bg);
+}
+:root[data-design='gongmun'] .page > header {
+  margin: 0 var(--sp-5) var(--sp-2);
+  padding: var(--sp-2) 0;
+  border-bottom: 3px double var(--color-text);
+}
+:root[data-design='gongmun'] .page > header h1 {
+  font-family: var(--gm-serif);
+  font-size: 21px;
+  letter-spacing: 0.2em;
+}
+:root[data-design='gongmun'] .page > header p {
+  color: var(--color-text-2);
+}
+/* 좁은 창: 단추 줄이 밖으로 밀리지 않게 조인다 */
+:root[data-design='gongmun'] .shell.narrow .page > header .actions {
+  gap: var(--sp-1);
+}
+:root[data-design='gongmun'] .shell.narrow .page > header .btn {
+  padding: 0 var(--sp-2);
+}
+:root[data-design='gongmun'] .page > header p::before {
+  content: '(' / '';
+}
+:root[data-design='gongmun'] .page > header p::after {
+  content: ')' / '';
+}
+:root[data-design='gongmun'] .page .card {
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-4);
+  border: 1px solid var(--color-text);
+  background: var(--color-bg);
+}
+:root[data-design='gongmun'] .page .card > h2 {
+  margin: 0 calc(-1 * var(--sp-4)) var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 3px double var(--color-text);
+  background: var(--color-surface);
+  font-family: var(--gm-serif);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.1em;
+}
+:root[data-design='gongmun'] .picker .item {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
+}
+:root[data-design='gongmun'] .picker .item.on {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+/* ── 표 ─ 세로 괘선과 이중 머리선, 남는 자리에도 줄이 이어진다 ─ */
+:root[data-design='gongmun'] :is(.table, .local) {
+  border: 1px solid var(--color-text);
+  border-top-width: 2px;
+}
+/* 스크롤 막대 자리까지 머리 줄이 이어지게 표 바탕에도 머리를 깐다 */
+:root[data-design='gongmun'] .dt {
+  background:
+    linear-gradient(
+      to bottom,
+      var(--color-surface) 29px,
+      var(--color-text) 29px 30px,
+      var(--color-surface) 30px 31px,
+      var(--color-text) 31px 32px,
+      transparent 32px
+    ),
+    var(--color-bg);
+}
+:root[data-design='gongmun'] .dt .inner {
+  background: linear-gradient(to bottom, transparent 29px, var(--color-border-subtle) 29px) 0 32px / 100% 30px;
+}
+/* 틀 없이 가장자리까지 가는 표(로그·정책)도 다른 표와 같은 용지로 놓는다 */
+:root[data-design='gongmun'] .page > .content:not(.padded) {
+  padding: 0 var(--sp-5) var(--sp-4);
+}
+:root[data-design='gongmun'] .page > .content:not(.padded) > .dt {
+  border: 1px solid var(--color-text);
+  border-top-width: 2px;
+}
+:root[data-design='gongmun'] .dt .head {
+  border-bottom: 3px double var(--color-text);
+}
+:root[data-design='gongmun'] .dt .hcell {
+  color: var(--color-text);
+  letter-spacing: 0.05em;
+}
+:root[data-design='gongmun'] .dt .resize {
+  top: 0;
+  bottom: 0;
+}
+:root[data-design='gongmun'] .dt .cell {
+  border-right: 1px solid var(--color-border-subtle);
+}
+:root[data-design='gongmun'] .dt .cell:last-child {
+  border-right: 0;
+}
+:root[data-design='gongmun'] .dt .row.sel {
+  box-shadow: inset 3px 0 0 var(--color-accent-fill);
+}
+:root[data-design='gongmun'] .dt:focus-visible .row.focused {
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+/* 공문의 끝 표시 */
+:root[data-design='gongmun'] .dt .body:has(.row)::after {
+  content: '끝.' / '';
+  position: absolute;
+  top: 100%;
+  left: var(--sp-2);
+  line-height: 29px;
+  color: var(--color-text-2);
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+}
+:root[data-design='gongmun'][lang='en'] .dt .body:has(.row)::after {
+  content: 'End.' / '';
+}
+
+/*
+ * ── 상태 ─ 인장. 찍힌 것만 면이 있고(쪽빛 성공, 인주 실패) 기운다. 황토 실선은 경고, 점선은 아직 찍히지 않은 것, 얇은 선은 중립이다 ─
+ * 글자는 바르게 두고 틀만 기울인다(상태 열을 훑을 때 글자가 흔들리지 않게).
+ * 내역 화면의 결재 상태는 StatusChip 이 아니라 글자 칸이다. .txt·.num 이 아닌 칸이 그것이다.
+ */
+:root[data-design='gongmun'] .chip,
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span:not(.txt, .num, :empty) {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 0 7px;
+  overflow: hidden;
+  line-height: 22px;
+  color: var(--gm-ink, var(--dot));
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+}
+:root[data-design='gongmun'] .chip::before,
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span:not(.txt, .num, :empty)::before {
+  content: '' / '';
+  position: absolute;
+  inset: 2px 1px;
+  z-index: -1;
+  border: var(--gm-weight, 1.5px) var(--gm-stroke, solid) var(--dot);
+  background: var(--gm-face, none);
+  transform: rotate(var(--gm-tilt));
+  pointer-events: none;
+}
+/* 찍힌 도장 */
+:root[data-design='gongmun'] .chip.tone-success,
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span.ok {
+  --dot: var(--color-accent-fill);
+  --gm-face: var(--color-accent-fill);
+  --gm-ink: var(--color-text-on-accent);
+}
+:root[data-design='gongmun'] .chip.tone-danger,
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span.bad {
+  --dot: var(--color-danger-fill);
+  --gm-face: var(--color-danger-fill);
+  --gm-ink: var(--color-text-on-accent);
+}
+:root[data-design='gongmun'] .chip.tone-warning {
+  --gm-face: var(--color-warning-subtle);
+}
+/* 아직 찍히지 않은 것은 곧게 둔다. 할 수 있는 일(결재요청 가능 등)은 쪽빛 굵은 점선, 기다리는 일은 회색 얇은 점선 */
+:root[data-design='gongmun'] .chip:is(.tone-info, .tone-accent, .tone-neutral),
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span:not(.txt, .num, .ok, .bad, :empty) {
+  --gm-tilt: 0deg;
+}
+:root[data-design='gongmun'] .chip.tone-info,
+:root[data-design='gongmun'] :is(#transHistoryTable, #approvalHistoryTable) .cell > span:not(.txt, .num, .ok, .bad, :empty) {
+  --dot: var(--color-border-strong);
+  --gm-ink: var(--color-text-2);
+  --gm-stroke: dashed;
+  --gm-weight: 1px;
+}
+:root[data-design='gongmun'] .chip.tone-accent {
+  --dot: var(--color-accent);
+  --gm-stroke: dashed;
+}
+/* 중립(취소됨 등)은 얇은 선으로 물러난다 */
+:root[data-design='gongmun'] .chip.tone-neutral {
+  --dot: var(--color-border);
+  --gm-ink: var(--color-text-2);
+  --gm-weight: 1px;
+}
+:root[data-design='gongmun'] .dt .cell:has(> .chip) {
+  padding: 0 var(--sp-1);
+}
+:root[data-design='gongmun'] .chip .dot {
+  display: none;
+}
+:root[data-design='gongmun'] .row:is([data-index$='1'], [data-index$='6']) {
+  --gm-tilt: 1deg;
+}
+:root[data-design='gongmun'] .row:is([data-index$='2'], [data-index$='9']) {
+  --gm-tilt: -0.8deg;
+}
+:root[data-design='gongmun'] .row:is([data-index$='3'], [data-index$='7']) {
+  --gm-tilt: 1.2deg;
+}
+:root[data-design='gongmun'] .row:is([data-index$='5'], [data-index$='8']) {
+  --gm-tilt: -1.2deg;
+}
+
+/* ── 단추 ─ 양식 칸처럼 각지고, 눌리면 내려앉는다 ───────── */
+:root[data-design='gongmun'] .btn {
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+:root[data-design='gongmun'] .btn.primary {
+  box-shadow: inset 0 0 0 1px var(--color-accent-fill), inset 0 0 0 2px var(--color-text-on-accent);
+}
+:root[data-design='gongmun'] .btn.secondary {
+  border-color: var(--color-border-strong);
+}
+:root[data-design='gongmun'] .btn.danger {
+  box-shadow: inset 0 0 0 1px var(--color-danger-fill), inset 0 0 0 2px var(--color-text-on-accent);
+}
+/* 누를 수 없는 단추는 종류와 상관없이 아직 찍히지 않은 빈 도장 자리다 */
+:root[data-design='gongmun'] .btn:disabled {
+  border: 1.5px dashed var(--color-text-disabled);
+  background: none;
+  box-shadow: none;
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+:root[data-design='gongmun'] .ib:disabled {
+  background: none;
+  color: var(--color-text-disabled);
+  opacity: 1;
+}
+:root[data-design='gongmun'] .btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+/* 결재처리의 승인·반려는 그 자체가 도장이다. 글자는 바르게 두고 면만 기울인다 */
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn:is(.primary, .danger) {
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.3em;
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn:is(.primary, .danger):not(:disabled) {
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn:is(.primary, .danger):not(:disabled)::before {
+  content: '' / '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--gm-face);
+  box-shadow: inset 0 0 0 1px var(--gm-face), inset 0 0 0 2px var(--color-text-on-accent);
+  transform: rotate(-1.2deg);
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn.primary {
+  --gm-face: var(--color-accent-fill);
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn.primary:hover {
+  --gm-face: var(--color-accent-fill-hover);
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn.primary:active {
+  --gm-face: var(--color-accent-fill-active);
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn.danger {
+  --gm-face: var(--color-danger-fill);
+}
+:root[data-design='gongmun'] .shell[data-route='approve'] .page > header .btn.danger:hover {
+  --gm-face: var(--color-danger-fill-hover);
+}
+:root[data-design='gongmun'] .ib[aria-pressed='true'] {
+  border-color: var(--color-text);
+  background: var(--color-surface);
+}
+
+/* ── 입력 ─ 줄 위에 쓰는 칸 ──────────────────────────── */
+:root[data-design='gongmun'] .field .box,
+:root[data-design='gongmun'] .field select {
+  border-color: var(--color-border);
+  border-bottom-color: var(--color-text);
+}
+:root[data-design='gongmun'] .field .box:focus-within,
+:root[data-design='gongmun'] .field select:focus-visible {
+  border-color: var(--color-focus);
+  box-shadow: inset 0 0 0 1px var(--color-focus);
+}
+:root[data-design='gongmun'] .field .box.invalid {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px var(--color-danger);
+}
+/* 잠긴 칸은 흐리지 않고 면으로 가른다. 칸이 왜 잠겼는지 알려 주는 안내 글자가 그 안에 있다 */
+:root[data-design='gongmun'] .field .box.disabled,
+:root[data-design='gongmun'] .field select:disabled {
+  background: var(--color-surface-sunken);
+  opacity: 1;
+}
+:root[data-design='gongmun'] .field select:disabled {
+  color: var(--color-text-disabled);
+}
+:root[data-design='gongmun'] .field .label {
+  color: var(--color-text);
+}
+
+/* ── 선택 ──────────────────────────────────────────── */
+:root[data-design='gongmun'] .sw .track,
+:root[data-design='gongmun'] .sw .thumb {
+  border-radius: 0;
+}
+:root[data-design='gongmun'] .sw .track {
+  border: 1px solid var(--color-text);
+  background: var(--color-surface-raised);
+}
+:root[data-design='gongmun'] .sw .thumb {
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-text-3);
+}
+:root[data-design='gongmun'] .sw[aria-checked='true'] .track {
+  background: var(--color-accent-fill);
+}
+:root[data-design='gongmun'] .sw[aria-checked='true'] .thumb {
+  background: var(--color-text-on-accent);
+}
+
+/* ── 진행 ─ 자 눈금 ─────────────────────────────────── */
+:root[data-design='gongmun'] [role='progressbar'] {
+  height: 8px;
+  border: 1px solid var(--color-text);
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--color-border) calc(10% - 1px) 10%);
+}
+:root[data-design='gongmun'] [role='progressbar'].sm {
+  height: 6px;
+}
+:root[data-design='gongmun'] [role='progressbar'] .fill {
+  transition: none;
+}
+:root[data-design='gongmun'] [role='progressbar'].indeterminate .fill {
+  left: 0;
+  animation: gm-slide 1.1s var(--ease) infinite;
+}
+@keyframes gm-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design='gongmun'] [role='progressbar'].indeterminate .fill {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}
+
+/* ── 대화상자 ─ 한 장의 공문 ─────────────────────────── */
+:root[data-design='gongmun'] .dlg {
+  border: 3px double var(--color-text);
+  background: var(--color-bg);
+}
+:root[data-design='gongmun'] .dlg > header {
+  margin: 0 var(--sp-5);
+  padding: var(--sp-4) 0 var(--sp-2);
+  border-bottom: 3px double var(--color-text);
+}
+:root[data-design='gongmun'] .dlg h2 {
+  font-family: var(--gm-serif);
+  font-size: var(--fs-xl);
+  letter-spacing: 0.12em;
+}
+:root[data-design='gongmun'] .dlg > .body {
+  padding-top: var(--sp-3);
+  color: var(--color-text);
+}
+/* 되돌릴 수 없는 일을 묻는 창은 제목과 머리선을 인주로 */
+:root[data-design='gongmun'] .dlg:has(footer .btn.danger) > header {
+  border-bottom-color: var(--color-danger);
+}
+:root[data-design='gongmun'] .dlg:has(footer .btn.danger) h2 {
+  color: var(--color-danger);
+}
+:root[data-design='gongmun'] .dlg > footer {
+  border-top: 1px solid var(--color-text);
+  background: var(--color-surface);
+}
+
+/* ── 전송 서랍 ─ 수발 대장 ───────────────────────────── */
+:root[data-design='gongmun'] .drawer {
+  border-top: 3px double var(--color-text);
+  background: var(--color-bg-chrome);
+}
+:root[data-design='gongmun'] .drawer > header .title {
+  font-family: var(--gm-serif);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.1em;
+}
+:root[data-design='gongmun'] .drawer > .body {
+  border-top: 1px solid var(--color-text);
+  background: var(--color-bg);
+}
+
+/* ── 알림·메뉴·툴팁 ─ 덧붙인 쪽지 ────────────────────── */
+:root[data-design='gongmun'] .toast {
+  border: 1px solid var(--color-text);
+  border-left: 5px solid var(--tone-fg);
+}
+:root[data-design='gongmun'] .menu {
+  padding: 0;
+  border-color: var(--color-text);
+}
+:root[data-design='gongmun'] .menu button {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+:root[data-design='gongmun'] .menu .sep {
+  height: 3px;
+  margin: 0;
+  border-top: 1px solid var(--color-text);
+  border-bottom: 1px solid var(--color-text);
+  background: none;
+}
+:root[data-design='gongmun'] .tip {
+  border-color: var(--color-text);
+}
+
+/* ── 빈 화면 ─ 비어 있는 날인 자리 ───────────────────── */
+:root[data-design='gongmun'] .overlay .empty {
+  height: auto;
+  padding: var(--sp-3) var(--sp-6);
+  background: var(--color-bg);
+}
+:root[data-design='gongmun'] .empty .icon {
+  border: 1.5px dashed var(--color-border-strong);
+  background: none;
+  transform: rotate(-6deg);
+}
+:root[data-design='gongmun'] .empty .title {
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+}
+
+/* ── 탭 ─ 화면 안 색인 ───────────────────────────────── */
+:root[data-design='gongmun'] .tabs button[aria-selected='true'] {
+  font-family: var(--gm-serif);
+  font-weight: var(--fw-bold);
+}
+:root[data-design='gongmun'] .tabs button[aria-selected='true']::after {
+  left: 0;
+  right: 0;
+  background: var(--color-text);
+}
+
+/* ── 로그인 ─ 기안 용지 ──────────────────────────────── */
+:root[data-design='gongmun'] #loginView {
+  background: var(--color-bg-chrome);
+}
+:root[data-design='gongmun'] #loginView .card {
+  border: 3px double var(--color-text);
+  background:
+    radial-gradient(circle at 11px 110px, var(--color-border) 3.8px, transparent 4.2px),
+    radial-gradient(circle at 11px 330px, var(--color-border) 3.8px, transparent 4.2px),
+    var(--color-bg);
+}
+:root[data-design='gongmun'] #loginView .brand {
+  background: none;
+  border-right: 1px solid var(--color-text);
+}
+:root[data-design='gongmun'] #loginView .tagline,
+:root[data-design='gongmun'] #loginView .ver {
+  color: var(--color-text-2);
+}
+:root[data-design='gongmun'] #loginView .form {
+  gap: 0;
+}
+:root[data-design='gongmun'] #loginView h1 {
+  margin-bottom: var(--sp-4);
+  padding-bottom: var(--sp-2);
+  border-bottom: 3px double var(--color-text);
+  font-family: var(--gm-serif);
+  letter-spacing: 0.3em;
+}
+:root[data-design='gongmun'] #loginView .nets {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  border: 1px solid var(--color-text);
+}
+:root[data-design='gongmun'] #loginView legend {
+  float: left;
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 100%;
+  margin: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-text);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+:root[data-design='gongmun'] #loginView .netlist {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0;
+}
+/* 망 이름 옆에 배지가 붙으면 두 칸에 들어가지 않아 한 줄에 하나씩 놓는다 */
+:root[data-design='gongmun'] #loginView .netlist:has(.badge) {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root[data-design='gongmun'] #loginView .net {
+  height: 36px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+:root[data-design='gongmun'] #loginView .net .dot {
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--color-text);
+  background: none;
+}
+:root[data-design='gongmun'] #loginView .net.on .dot {
+  box-shadow: inset 0 0 0 2px var(--color-surface-raised);
+  background: var(--color-accent-fill);
+}
+:root[data-design='gongmun'] #loginView .net.on .nname {
+  font-family: var(--gm-serif);
+}
+:root[data-design='gongmun'] #loginView .direction {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-1);
+  color: var(--color-text-2);
+}
+:root[data-design='gongmun'] #loginView .field {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 0;
+  margin-top: -1px;
+  border: 1px solid var(--color-text);
+}
+:root[data-design='gongmun'] #loginView .field .label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+:root[data-design='gongmun'] #loginView .field .box {
+  border: 0;
+  background: var(--color-surface-raised);
+}
+:root[data-design='gongmun'] #loginView .field .note {
+  grid-column: 1 / -1;
+  padding: var(--sp-1) var(--sp-3);
+  border-top: 1px solid var(--color-border);
+}
+:root[data-design='gongmun'] #loginView .cb {
+  margin-top: var(--sp-3);
+}
+:root[data-design='gongmun'] #loginView .error {
+  margin: var(--sp-2) 0;
+}
+
+/* ── 영어 ─ 한글용 자간이 라틴 글자를 벌려 단추 줄을 밀어내지 않게 ───── */
+:root[data-design='gongmun'][lang='en']
+  :is(
+    .page > header h1,
+    .page .card > h2,
+    .dlg h2,
+    .drawer > header .title,
+    .side li .item[aria-current='page'],
+    .shell[data-route='approve'] .page > header .btn,
+    #loginView h1,
+    #loginView .name
+  ) {
+  letter-spacing: 0.02em;
+  word-spacing: 0;
+}
+/* 영어 단추 글자는 한글보다 길어 1280 에서도 조인다. 800 에서는 아이콘 단추까지 한 줄에 들어가게 더 조인다 */
+:root[data-design='gongmun'][lang='en'] .page > header .actions {
+  gap: var(--sp-1);
+}
+:root[data-design='gongmun'][lang='en'] .page > header .btn {
+  padding: 0 var(--sp-2);
+}
+:root[data-design='gongmun'][lang='en'] .shell.narrow .page > header .btn {
+  gap: var(--sp-1);
+  padding: 0 var(--sp-1);
+}

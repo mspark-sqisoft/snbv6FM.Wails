@@ -1,0 +1,1295 @@
+/*
+ * 운송장(docs/DESIGNS.md). 창 전체가 골판지 상자의 옆면이고, 정보는 그 위에 붙인 흰 라벨에 찍힌다.
+ * 재료 셋: 크라프트(바탕)·연속 용지 라벨(구멍 띠와 점선 절취선)·안전 주황(주 동작)과 사선 테이프(위험).
+ * 입력 칸은 운송장의 괘선 칸이고, 메뉴는 구멍 뚫린 꼬리표이며, 상태 칩은 취급주의 스티커다.
+ */
+:root[data-design='waybill'] {
+  color-scheme: light;
+
+  --color-bg: #c9ae85;
+  --color-bg-chrome: #dbc7a5;
+  --color-surface: #f3ecdd;
+  --color-surface-raised: #fbf8f1;
+  --color-surface-sunken: #ece3d0;
+  --color-row-alt: #f6f1e6;
+  --color-hover: rgba(26, 26, 26, 0.06);
+  --color-active: rgba(26, 26, 26, 0.12);
+  --color-selected: #ffe3ce;
+  --color-selected-hover: #ffd6b6;
+  --color-border-subtle: #e3d9c4;
+  --color-border: #8f7d61;
+  --color-border-strong: #1a1a1a;
+  --color-text: #1a1a1a;
+  --color-text-2: #352d21;
+  --color-text-3: #463b2b;
+  --color-text-disabled: #776b55;
+  --color-text-on-accent: #1a1a1a;
+  --color-accent: #7a2c00;
+  --color-accent-fill: #f05a00;
+  --color-accent-fill-hover: #ff6d17;
+  --color-accent-fill-active: #d24e00;
+  --color-accent-subtle: #ffe9d9;
+  --color-focus: #1a1a1a;
+  --color-brand: #f05a00;
+
+  --color-success: #0d4a2a;
+  --color-success-subtle: #dcecdc;
+  --color-success-border: #4f8f69;
+  --color-warning: #633600;
+  --color-warning-subtle: #fbeccb;
+  --color-warning-border: #b98a35;
+  --color-danger: #8a0f12;
+  --color-danger-subtle: #fde3df;
+  --color-danger-border: #cf6a60;
+  --color-danger-fill: #ffc400;
+  --color-danger-fill-hover: #ffb000;
+  --color-info: #1f3a66;
+  --color-info-subtle: #e1e8f3;
+  --color-info-border: #7188ae;
+  --color-neutral: #463b2b;
+  --color-neutral-subtle: #ece3d0;
+  --color-neutral-border: #8f7d61;
+
+  --color-net-business: #4a1f8f;
+  --color-net-business-subtle: #eee6fb;
+  --color-net-business-border: #8a6fc4;
+  --color-net-internet: #00504c;
+  --color-net-internet-subtle: #dbf0ec;
+  --color-net-internet-border: #3f958e;
+
+  --color-scrim: rgba(26, 26, 26, 0.55);
+
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-xl: 0;
+  --r-full: 0;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: 3px 3px 0 rgba(26, 26, 26, 0.75);
+  --dur-fast: 80ms;
+  --dur: 120ms;
+  --dur-slow: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-mono: 'IBM Plex Mono', 'Pretendard Variable', Pretendard, 'Malgun Gothic', monospace;
+
+  /* 이 디자인만의 재료 */
+  --wb-display: 'Black Han Sans', 'Pretendard Variable', Pretendard, 'Malgun Gothic', sans-serif;
+  --wb-ink: #1a1a1a;
+  --wb-label: #fbf8f1;
+  --wb-orange: #f05a00;
+  --wb-tape: #ffc400;
+  --wb-flute: repeating-linear-gradient(90deg, rgba(92, 64, 24, 0.035) 0 3px, transparent 3px 8px);
+  --wb-hole: radial-gradient(circle at 8px 12px, var(--color-bg) 0 3.4px, rgba(26, 26, 26, 0.45) 3.6px 4.2px, transparent 4.6px);
+  /* 꼬리표 구멍은 잘린 모서리에 뚫는다. 글자 앞에 두면 라디오 단추로 읽힌다 */
+  --wb-tag-hole: radial-gradient(circle at 9px 9px, var(--color-bg-chrome) 0 1.6px, var(--wb-ink) 1.9px 2.5px, transparent 2.8px);
+  --wb-tear: repeating-linear-gradient(180deg, var(--wb-ink) 0 3px, transparent 3px 7px);
+  --wb-hazard: repeating-linear-gradient(-45deg, var(--wb-ink) 0 6px, var(--wb-tape) 6px 12px);
+  /* 표 머리 뒤에 깔아 스크롤바 자리까지 검은 머리가 이어지게 한다 */
+  --wb-headband: linear-gradient(var(--wb-ink), var(--wb-ink)) 0 0 / 100% 32px no-repeat padding-box;
+  --wb-feed:
+    var(--wb-hole) 0 0 / 16px 24px repeat-y border-box, var(--wb-hole) 100% 0 / 16px 24px repeat-y border-box,
+    var(--wb-tear) 15px 0 / 1px 100% no-repeat border-box, var(--wb-tear) calc(100% - 15px) 0 / 1px 100% no-repeat border-box,
+    var(--color-surface-raised);
+}
+
+/* ── 바탕과 공통 ─────────────────────────────────────── */
+
+:root[data-design='waybill'] main.content,
+:root[data-design='waybill'] .login {
+  background: var(--wb-flute), var(--color-bg);
+}
+
+:root[data-design='waybill'] * {
+  scrollbar-color: var(--color-border) transparent;
+}
+
+:root[data-design='waybill'] ::selection {
+  background: var(--wb-orange);
+  color: var(--wb-ink);
+}
+
+/* 초점: 먹 띠와 주황 띠를 겹친다. 오류의 붉은 단색 테두리와 색이 아니라 형태로 갈린다.
+   표·창·틈 손잡이는 제 방식이 있고, 입력 칸은 바깥 .field 가 대신 표시한다 */
+:root[data-design='waybill'] :focus-visible:not(.dt, .dlg, .menu, .menu button, .tree, .grip, .gutter, input, select),
+:root[data-design='waybill'] .cb input:focus-visible + .box,
+:root[data-design='waybill'] .opt input:focus-visible,
+:root[data-design='waybill'] .field:focus-within,
+:root[data-design='waybill'] .net:has(input:focus-visible),
+:root[data-design='waybill'] .picker .item:has(input:focus-visible),
+:root[data-design='waybill'] section.card label.date:focus-within {
+  outline: 2px solid var(--wb-ink);
+  outline-offset: 0;
+  box-shadow: 0 0 0 4px var(--wb-orange);
+}
+
+/* ── 머리줄 ─────────────────────────────────────────── */
+
+:root[data-design='waybill'] #toolBar {
+  background: var(--wb-flute), var(--color-bg-chrome);
+  border-bottom: 2px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .logo .bg {
+  rx: 0;
+}
+
+:root[data-design='waybill'] .logo .word,
+:root[data-design='waybill'] .logo .word b {
+  font-family: var(--wb-display);
+  font-weight: var(--fw-regular);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] #toolBar .sep {
+  width: 2px;
+  background: var(--wb-ink);
+}
+
+:root[data-design='waybill'] #toolBar .dir {
+  color: var(--wb-ink);
+  font-weight: var(--fw-semibold);
+}
+
+:root[data-design='waybill'] .badge {
+  border-width: 1.5px;
+  border-color: var(--tone-fg);
+  font-weight: var(--fw-bold);
+}
+
+:root[data-design='waybill'] #toolBar .badge {
+  background: var(--tone-fg);
+  color: var(--wb-label);
+}
+
+:root[data-design='waybill'] #toolBar .user {
+  border: 1.5px solid transparent;
+}
+
+:root[data-design='waybill'] #toolBar .user:hover:not(:disabled) {
+  background: var(--color-surface-raised);
+  border-color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] #toolBar .avatar {
+  border-radius: 0;
+  background: var(--wb-ink);
+  color: var(--wb-label);
+}
+
+/* ── 상단 탭·왼쪽 메뉴: 구멍 뚫린 꼬리표 ──────────────────────── */
+
+:root[data-design='waybill'] .tabs.nav {
+  gap: 3px;
+  padding: 6px var(--sp-3) 0;
+  background: var(--wb-flute), var(--color-bg-chrome);
+  border-bottom: 2px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .tabs.nav [role='tab'] {
+  height: 32px;
+  padding: 0 var(--sp-3) 0 18px;
+  margin-bottom: -2px;
+  border-radius: 0;
+  background: var(--wb-tag-hole), var(--color-bg);
+  color: var(--wb-ink);
+  font-weight: var(--fw-semibold);
+  clip-path: polygon(9px 0, 100% 0, 100% 100%, 0 100%, 0 9px);
+}
+
+:root[data-design='waybill'] .tabs.nav [role='tab']:hover:not(:disabled) {
+  background: var(--wb-tag-hole), var(--color-surface);
+}
+
+:root[data-design='waybill'] .tabs.nav [role='tab'][aria-selected='true'] {
+  background: var(--wb-tag-hole), var(--color-surface-raised);
+  font-weight: var(--fw-bold);
+  box-shadow: inset 0 3px 0 var(--wb-orange);
+}
+
+:root[data-design='waybill'] .tabs.nav [role='tab']::after {
+  content: none;
+}
+
+:root[data-design='waybill'] .tabs.nav [role='tab'] svg {
+  color: var(--wb-ink);
+}
+
+/* 옆 탭에 가려지지 않게 띠를 안쪽으로 그린다 */
+:root[data-design='waybill'] .tabs.nav [role='tab']:focus-visible {
+  clip-path: none;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--wb-orange);
+}
+
+:root[data-design='waybill'] #sideMenu {
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-2);
+  background: var(--wb-flute), var(--color-bg-chrome);
+  border-right: 2px solid var(--wb-ink);
+  transition: none;
+}
+
+:root[data-design='waybill'] #sideMenu .item:not(.toggle) {
+  height: 38px;
+  padding-left: 18px;
+  background: var(--wb-tag-hole), var(--color-bg);
+  color: var(--wb-ink);
+  font-weight: var(--fw-semibold);
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+:root[data-design='waybill'] #sideMenu .item:not(.toggle):hover {
+  background: var(--wb-tag-hole), var(--color-surface);
+}
+
+:root[data-design='waybill'] #sideMenu .item[aria-current='page'] {
+  background: var(--wb-tag-hole), var(--color-surface-raised);
+  margin-right: -2px;
+  width: calc(100% + 2px);
+  font-weight: var(--fw-bold);
+  box-shadow: inset 0 3px 0 var(--wb-orange);
+}
+
+:root[data-design='waybill'] #sideMenu .item[aria-current='page']::before {
+  content: none;
+}
+
+:root[data-design='waybill'] #sideMenu .item[aria-current='page'] svg,
+:root[data-design='waybill'] #sideMenu .item svg {
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] #sideMenu .item:focus-visible {
+  clip-path: none;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--wb-orange);
+}
+
+:root[data-design='waybill'] #sideMenu.collapsed {
+  padding-left: var(--sp-1);
+}
+
+:root[data-design='waybill'] #sideMenu.collapsed .item:not(.toggle) {
+  padding: 0 0 0 4px;
+  background-image: none;
+}
+
+:root[data-design='waybill'] #sideMenu .toggle {
+  color: var(--wb-ink);
+}
+
+/* ── 화면 제목: 상자에 찍은 스텐실과 바코드 스티커 ─────────────────── */
+
+:root[data-design='waybill'] .page > header .titles {
+  align-items: center;
+}
+
+/* Black Han Sans 는 획이 굵어 30px 아래에서 ㄹ·ㅍ 의 속이 막힌다. 그보다 작은 제목은 본문 글꼴을 굵게 쓴다 */
+:root[data-design='waybill'] .page > header h1 {
+  font-family: var(--wb-display);
+  font-size: 32px;
+  font-weight: var(--fw-regular);
+  line-height: 1;
+}
+
+:root[data-design='waybill'] .page > header p {
+  order: 2;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--wb-ink);
+}
+
+/* 좁은 창: 단추를 한 줄에 담고 머리를 낮춰 표에 높이를 돌려준다 */
+:root[data-design='waybill'] .shell.narrow .page > header {
+  row-gap: var(--sp-1);
+  padding-block: var(--sp-1);
+}
+
+:root[data-design='waybill'] .shell.narrow .page > header .actions {
+  gap: var(--sp-1);
+}
+
+:root[data-design='waybill'] .shell.narrow .page > header .actions .btn {
+  padding-inline: 6px;
+}
+
+:root[data-design='waybill'] .page > header .titles::after,
+:root[data-design='waybill'] .login h1::after {
+  content: var(--wb-barcode-text) / '';
+  order: 1;
+  flex: none;
+  box-sizing: content-box;
+  width: var(--wb-barcode-w);
+  height: 30px;
+  padding: 2px var(--sp-1) 0;
+  background: var(--wb-barcode) var(--sp-1) 3px / var(--wb-barcode-w) 16px no-repeat, var(--wb-label);
+  color: var(--wb-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 44px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ── 단추 ─────────────────────────────────────────── */
+
+:root[data-design='waybill'] .btn {
+  border-width: 1.5px;
+  font-weight: var(--fw-bold);
+}
+
+:root[data-design='waybill'] .btn.secondary {
+  border-color: var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .btn.secondary:hover:not(:disabled) {
+  border-color: var(--wb-ink);
+  background: var(--color-selected);
+}
+
+:root[data-design='waybill'] .btn.primary,
+:root[data-design='waybill'] .btn.danger {
+  border-color: var(--wb-ink);
+  box-shadow: 2px 2px 0 var(--wb-ink);
+}
+
+:root[data-design='waybill'] .btn.danger {
+  border: 4px solid transparent;
+  background: linear-gradient(var(--color-danger-fill), var(--color-danger-fill)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .btn.danger:hover:not(:disabled) {
+  background: linear-gradient(var(--color-danger-fill-hover), var(--color-danger-fill-hover)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+:root[data-design='waybill'] .btn:disabled {
+  border: 1.5px dashed var(--color-text-3);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-3);
+  opacity: 1;
+}
+
+:root[data-design='waybill'] .ib {
+  border-width: 1.5px;
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .ib:hover:not(:disabled) {
+  border-color: var(--wb-ink);
+  background: var(--color-surface-raised);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .ib[aria-pressed='true'] {
+  border-color: var(--wb-ink);
+  background: var(--wb-orange);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .ib.secondary {
+  border-color: var(--wb-ink);
+}
+
+/* 글자 단추의 점선 비활성과 같은 표현. 흐리게만 하면 크라프트 위에서 사라진다 */
+:root[data-design='waybill'] .ib:disabled {
+  border: 1.5px dashed var(--color-text-3);
+  color: var(--color-text-3);
+  opacity: 1;
+}
+
+/* 아이콘만 있는 위험 동작(삭제·모두 취소)도 사선 테이프를 두른다. 호버해도 테이프는 남고 안쪽 면만 바뀐다 */
+:root[data-design='waybill'] .ib.danger:not(:disabled) {
+  border: 3px solid transparent;
+  background: linear-gradient(var(--color-surface-raised), var(--color-surface-raised)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .ib.danger:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(var(--color-selected-hover), var(--color-selected-hover)) padding-box, var(--wb-hazard) border-box;
+}
+
+/* ── 입력 칸: 운송장의 괘선 칸. 칸 이름이 칸 안 왼쪽 위에 박힌다 ─────────── */
+
+:root[data-design='waybill'] .field:has(> .label) {
+  gap: 0;
+  padding-top: 3px;
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .field > .label {
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+  color: var(--color-text-3);
+}
+
+:root[data-design='waybill'] .field > .box {
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .field:has(> .label) > .box {
+  height: 28px;
+  border: 0;
+  background: none;
+}
+
+:root[data-design='waybill'] .field:has(> .label) > .box.lg {
+  height: 34px;
+}
+
+:root[data-design='waybill'] .field > .box input {
+  padding-inline: var(--sp-2);
+}
+
+:root[data-design='waybill'] .field select {
+  border: 0;
+  background: none;
+  padding-left: var(--sp-2);
+}
+
+:root[data-design='waybill'] .field > .box .lead {
+  padding-left: var(--sp-2);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .field > .box .chev {
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .field > .box:focus-within,
+:root[data-design='waybill'] .field:has(> .label) > .box:focus-within,
+:root[data-design='waybill'] .field select:focus-visible {
+  box-shadow: none;
+}
+
+/* 오류: 붉은 테두리에 붉은 면. 초점이 함께 있어도 주황 띠 안쪽이 붉어 갈린다 */
+:root[data-design='waybill'] .field:has(> .box.invalid) {
+  border-color: var(--color-danger);
+  outline: 2px solid var(--color-danger);
+  outline-offset: 0;
+}
+
+:root[data-design='waybill'] .field:has(> .box.invalid),
+:root[data-design='waybill'] .field:has(> .box.invalid) > .box {
+  background: var(--color-danger-subtle);
+  box-shadow: none;
+}
+
+:root[data-design='waybill'] .field .note {
+  padding: 0 var(--sp-2) 2px;
+}
+
+/* 비활성: 단추와 같은 점선과 진한 글자. 흐리게만 하면 칸의 조건을 알리는 안내까지 못 읽는다.
+   이름표가 있으면 바깥 칸이, 없으면 안쪽 칸이 테두리를 그린다 */
+:root[data-design='waybill'] .field:has(> .label):has(input:disabled, select:disabled),
+:root[data-design='waybill'] .field:not(:has(> .label)) > .box:has(input:disabled, select:disabled) {
+  border-style: dashed;
+  border-color: var(--color-text-3);
+}
+
+:root[data-design='waybill'] .field > .box.disabled,
+:root[data-design='waybill'] .field > .box :is(input, select):disabled,
+:root[data-design='waybill'] .field > .box:has(select:disabled) .chev,
+:root[data-design='waybill'] .cb.disabled,
+:root[data-design='waybill'] .sw:disabled {
+  color: var(--color-text-3);
+  opacity: 1;
+}
+
+:root[data-design='waybill'] .cb.disabled .box,
+:root[data-design='waybill'] .sw:disabled .track {
+  border-style: dashed;
+}
+
+/* 체크·라디오·스위치: 칸에 표시하는 표기. 체크는 네모, 하나만 고르는 라디오는 마름모다 */
+:root[data-design='waybill'] .cb .box,
+:root[data-design='waybill'] .selcell .box {
+  border: 1.5px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .cb input:checked + .box,
+:root[data-design='waybill'] .cb input:indeterminate + .box,
+:root[data-design='waybill'] .selcell .box.on {
+  border-color: var(--wb-ink);
+  background: var(--wb-orange);
+}
+
+:root[data-design='waybill'] .opt input {
+  appearance: none;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin: 2px;
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+  transform: rotate(45deg);
+}
+
+:root[data-design='waybill'] .opt input:checked {
+  background:
+    linear-gradient(var(--wb-ink), var(--wb-ink)) center / 6px 6px no-repeat,
+    var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .sw .track {
+  width: 36px;
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .sw .thumb {
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 0;
+  background: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .sw[aria-checked='true'] .track {
+  background: var(--wb-orange);
+}
+
+:root[data-design='waybill'] .sw[aria-checked='true'] .thumb {
+  transform: translateX(18px);
+}
+
+/* ── 표: 구멍 띠가 달린 연속 용지 ─────────────────────────────── */
+
+:root[data-design='waybill'] .table {
+  border: 0;
+}
+
+/* 이 두 화면만 본문 여백이 없다. 다른 화면처럼 상자에 붙인 라벨로 띄운다 */
+:root[data-design='waybill'] .shell:is([data-route='log'], [data-route='policy']) .page > .content {
+  padding: 0 var(--sp-5) var(--sp-4);
+}
+
+/* 입력 칸 안쪽 여백이 기본보다 좁아 필터 줄의 계산 폭이 줄고, 그만큼 마지막 칸이 혼자 다음 줄로 내려간다 */
+:root[data-design='waybill'] .toolbar .filters {
+  flex-wrap: nowrap;
+}
+
+:root[data-design='waybill'] .toolbar .filters > :not(.word) {
+  flex: none;
+}
+
+/* 파일을 끌어 오면 표 전체가 짐을 놓을 자리가 된다 */
+:root[data-design='waybill'] .table.over,
+:root[data-design='waybill'] .table.file-drop-target-active {
+  box-shadow: none;
+  outline: 3px dashed var(--wb-orange);
+  outline-offset: -3px;
+}
+
+:root[data-design='waybill'] .dt {
+  border-inline: 16px solid transparent;
+  background: var(--wb-headband), var(--wb-feed);
+}
+
+/* 행이 끝나도 괘선은 용지 끝까지 이어진다. 행의 밑줄과 같은 자리라 겹쳐도 한 줄로 보인다 */
+:root[data-design='waybill'] .dt .inner {
+  background: repeating-linear-gradient(180deg, transparent 0 calc(var(--row-h) - 1px), var(--color-border-subtle) calc(var(--row-h) - 1px) var(--row-h)) 0 32px;
+}
+
+:root[data-design='waybill'] .dt .head {
+  background: var(--wb-ink);
+  border-bottom: 0;
+}
+
+:root[data-design='waybill'] .dt .hcell {
+  color: var(--wb-label);
+  font-weight: var(--fw-bold);
+}
+
+:root[data-design='waybill'] .dt .hbtn:hover {
+  background: rgba(251, 248, 241, 0.16);
+  color: var(--wb-label);
+}
+
+:root[data-design='waybill'] .dt .hbtn:focus-visible {
+  outline-color: var(--wb-orange);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+:root[data-design='waybill'] .dt .hbtn svg {
+  color: var(--wb-orange);
+}
+
+:root[data-design='waybill'] .dt .resize::after {
+  background: rgba(251, 248, 241, 0.4);
+}
+
+:root[data-design='waybill'] .dt .resize:hover::after {
+  background: var(--wb-orange);
+}
+
+/* 세로 괘선은 글자 폭을 쓰지 않게 그림자로 그린다. 테두리면 일시 열이 1px 줄어 분이 잘린다 */
+:root[data-design='waybill'] .dt .row .cell + .cell {
+  box-shadow: inset 1px 0 0 var(--color-border-subtle);
+}
+
+:root[data-design='waybill'] .dt .row.sel {
+  box-shadow: inset 4px 0 0 var(--wb-orange);
+}
+
+:root[data-design='waybill'] .dt:focus-visible .row.focused {
+  box-shadow: inset 0 0 0 2px var(--wb-ink), inset 0 0 0 4px var(--wb-orange);
+}
+
+/* 수치는 고정폭. 일시 열은 폭이 좁아 고정폭이면 더 잘리므로 그대로 둔다 */
+:root[data-design='waybill'] .dt .cell.right,
+:root[data-design='waybill'] .dt .num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  letter-spacing: -0.04em;
+}
+
+:root[data-design='waybill'] .dt .badge.sm {
+  font-size: var(--fs-body);
+}
+
+:root[data-design='waybill'] .dt .name svg {
+  color: var(--wb-ink);
+}
+
+/* 상태 칩: 취급주의 스티커. 왼쪽 칸의 표식과 글자로 뜻을 읽고 색은 거든다.
+   글줄 상자로 그려야 긴 글자 끝에 … 가 붙는다(inline-flex 의 글자에는 듣지 않는다) */
+:root[data-design='waybill'] .chip,
+:root[data-design='waybill'] .aprv-state:not(:empty) {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+  height: 22px;
+  padding-right: 3px;
+  border: 1.5px solid var(--dot);
+  background: var(--halo);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  line-height: 19px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-design='waybill'] .chip .dot,
+:root[data-design='waybill'] .aprv-state:not(:empty)::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: top;
+  width: 13px;
+  height: 100%;
+  margin-right: 3px;
+  border-radius: 0;
+  background: var(--dot);
+  box-shadow: none;
+  color: var(--wb-label);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+:root[data-design='waybill'] .chip.tone-neutral .dot::after {
+  content: '-';
+}
+:root[data-design='waybill'] .chip.tone-info .dot::after,
+:root[data-design='waybill'] .chip.tone-accent .dot::after {
+  content: '\22ef';
+}
+:root[data-design='waybill'] .chip.tone-success .dot::after {
+  content: '\2713';
+}
+:root[data-design='waybill'] .chip.tone-warning .dot::after {
+  content: '!';
+}
+:root[data-design='waybill'] .chip.tone-danger .dot::after {
+  content: '\00d7';
+}
+
+/* 스티커의 테두리와 표식 칸이 쓴 폭을 칸 여백에서 돌려받아 표 글자 길이를 기본 디자인에 맞춘다 */
+:root[data-design='waybill'] .dt .cell:has(> .chip) {
+  padding-inline: 4px;
+}
+
+:root[data-design='waybill'] .chip {
+  letter-spacing: -0.015em;
+}
+
+/* 경고만 먹 테두리의 노란 취급주의 스티커다. 네 색이 같은 모양이면 표식 글자로만 갈린다 */
+:root[data-design='waybill'] .chip.tone-warning {
+  --dot: var(--wb-tape);
+  --halo: #fff3c4;
+  border-color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .chip.tone-warning .dot {
+  color: var(--wb-ink);
+}
+
+/* 결재상태 열: 승인·반려·그 밖의 요청을 칩과 같은 라벨로 찍는다. 앱이 주는 클래스는 ok·bad 뿐이다 */
+:root[data-design='waybill'] .aprv-state:not(:empty) {
+  --dot: var(--color-info);
+  --halo: var(--color-info-subtle);
+  --mark: '\22ef';
+}
+
+:root[data-design='waybill'] .aprv-state.ok {
+  --dot: var(--color-success);
+  --halo: var(--color-success-subtle);
+  --mark: '\2713';
+}
+
+:root[data-design='waybill'] .aprv-state.bad {
+  --dot: var(--color-danger);
+  --halo: var(--color-danger-subtle);
+  --mark: '\00d7';
+}
+
+:root[data-design='waybill'] .aprv-state:not(:empty)::before {
+  content: var(--mark) / '';
+}
+
+/* 진행 막대: 눈금 자. 안쪽을 빗금으로 채운다 */
+:root[data-design='waybill'] [role='progressbar'] {
+  height: 8px;
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--wb-ink);
+}
+
+:root[data-design='waybill'] .busy [role='progressbar'] {
+  height: 4px;
+}
+
+:root[data-design='waybill'] [role='progressbar'] .fill {
+  transition: none;
+  background: repeating-linear-gradient(-45deg, var(--wb-orange) 0 4px, var(--wb-ink) 4px 6px);
+}
+
+:root[data-design='waybill'] [role='progressbar'].indeterminate .fill {
+  left: 0;
+  animation: wb-slide 1.1s linear infinite;
+}
+
+@keyframes wb-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* ── 빈 화면: 라벨을 붙일 빈자리 ──────────────────────────────── */
+
+:root[data-design='waybill'] .empty {
+  height: auto;
+  min-width: min(360px, 90%);
+  border: 2px dashed var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .empty .icon {
+  border: 2px solid var(--wb-ink);
+  border-radius: 0;
+  background: none;
+  color: var(--wb-ink);
+  transform: rotate(-4deg);
+}
+
+/* 문장이라 장식 글꼴을 쓰지 않는다 */
+:root[data-design='waybill'] .empty .title {
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-lg);
+}
+
+/* ── 대화상자: 한 장 뜯어낸 라벨 ───────────────────────────────── */
+
+:root[data-design='waybill'] .dlg {
+  border-block: 0;
+  border-inline: 16px solid transparent;
+  outline: 2px solid var(--wb-ink);
+  background: var(--wb-feed);
+  box-shadow: 5px 5px 0 rgba(26, 26, 26, 0.75);
+}
+
+:root[data-design='waybill'] .dlg::backdrop {
+  background: var(--color-scrim);
+}
+
+:root[data-design='waybill'] .dlg header {
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  background: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .dlg h2 {
+  color: var(--wb-label);
+  font-family: inherit;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+:root[data-design='waybill'] .dlg header .ib {
+  color: var(--wb-label);
+}
+
+:root[data-design='waybill'] .dlg header .ib:hover:not(:disabled) {
+  background: var(--wb-orange);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .dlg .body {
+  padding: var(--sp-3);
+  color: var(--color-text);
+}
+
+:root[data-design='waybill'] .dlg footer {
+  position: relative;
+  padding: var(--sp-3);
+  border-top: 2px dashed var(--wb-ink);
+  background: var(--color-surface-sunken);
+}
+
+/* 절취선의 가위 */
+:root[data-design='waybill'] .dlg footer::before {
+  content: '\2702\fe0e' / '';
+  position: absolute;
+  left: var(--sp-3);
+  top: -10px;
+  padding: 0 var(--sp-1);
+  background: linear-gradient(var(--color-surface-raised) 50%, var(--color-surface-sunken) 50%);
+  color: var(--wb-ink);
+  font-size: 15px;
+  line-height: 18px;
+}
+
+:root[data-design='waybill'] .dlg:has(footer .btn.danger) header {
+  border-top: 8px solid transparent;
+  background: linear-gradient(var(--wb-ink), var(--wb-ink)) padding-box, var(--wb-hazard) border-box;
+}
+
+/* ── 전송 서랍: 벨트 위 적하 목록 ─────────────────────────────── */
+
+:root[data-design='waybill'] .drawer {
+  border-top: 2px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .drawer header {
+  border-inline: 16px solid transparent;
+  background: var(--wb-feed);
+}
+
+:root[data-design='waybill'] .drawer .title {
+  font-family: inherit;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .drawer .summary {
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .drawer .body {
+  border-top: 2px dashed var(--wb-ink);
+}
+
+/* 빈 서랍도 같은 연속 용지다. 닫힌 서랍의 hidden 을 덮지 않게 :not 을 붙인다 */
+:root[data-design='waybill'] .drawer .body:not([hidden]):has(> .empty) {
+  display: grid;
+  place-items: center;
+  border-inline: 16px solid transparent;
+  background: var(--wb-feed);
+}
+
+:root[data-design='waybill'] .drawer .body .empty {
+  width: min(360px, 90%);
+}
+
+:root[data-design='waybill'] .drawer .ib:hover:not(:disabled) {
+  background: var(--color-selected);
+}
+
+:root[data-design='waybill'] .drawer .grip:hover,
+:root[data-design='waybill'] .drawer .grip:focus-visible,
+:root[data-design='waybill'] .drawer .grip.dragging {
+  background: var(--wb-orange);
+}
+
+/* ── 작은 라벨들 ─────────────────────────────────────── */
+
+:root[data-design='waybill'] .tip {
+  border-color: var(--wb-ink);
+  background: var(--wb-ink);
+  color: var(--wb-label);
+}
+
+:root[data-design='waybill'] .menu {
+  padding: 0;
+  border: 2px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .menu button {
+  border-bottom: 1px dashed var(--color-border);
+}
+
+:root[data-design='waybill'] .menu button:hover:not(:disabled),
+:root[data-design='waybill'] .menu button:focus-visible {
+  background: var(--wb-orange);
+  color: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .menu button.danger {
+  border-left: 6px solid transparent;
+  background: linear-gradient(var(--color-surface-raised), var(--color-surface-raised)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .menu button.danger:hover:not(:disabled),
+:root[data-design='waybill'] .menu button.danger:focus-visible {
+  background: linear-gradient(var(--wb-orange), var(--wb-orange)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .menu .ico {
+  color: inherit;
+}
+
+:root[data-design='waybill'] .menu .sep {
+  height: 2px;
+  margin: 0;
+  background: var(--wb-ink);
+}
+
+:root[data-design='waybill'] .toast {
+  border: 2px solid var(--wb-ink);
+  border-left: 10px solid var(--tone-fg);
+}
+
+/* 경고는 단색 노랑, 오류만 사선 테이프다 */
+:root[data-design='waybill'] .toast.warning {
+  border-left-color: var(--wb-tape);
+}
+
+:root[data-design='waybill'] .toast.danger {
+  border-left-color: transparent;
+  background: linear-gradient(var(--color-surface-raised), var(--color-surface-raised)) padding-box, var(--wb-hazard) border-box;
+}
+
+:root[data-design='waybill'] .local {
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] input::-webkit-search-cancel-button {
+  filter: grayscale(1) brightness(0.2);
+}
+
+:root[data-design='waybill'] .picker .item {
+  border: 1.5px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .picker .item.on {
+  border-color: var(--wb-ink);
+  background: var(--color-selected);
+  box-shadow: inset 0 0 0 2px var(--wb-orange);
+}
+
+/* 사전결재 안내: 라벨 면에 먹 테두리와 왼쪽 먹 띠를 두른 안내 표식 */
+:root[data-design='waybill'] .shell[data-route='request'] p.note {
+  border: 1.5px solid var(--wb-ink);
+  border-left-width: 8px;
+  background: var(--color-surface-raised);
+  color: var(--wb-ink);
+}
+
+/* ── 설정·카드: 칸마다 구멍 띠가 달린 라벨 ─────────────────────────── */
+
+:root[data-design='waybill'] section.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-3) var(--sp-4);
+  border: 0;
+  border-inline: 16px solid transparent;
+  background: var(--wb-feed);
+}
+
+/* 라벨 안의 표는 구멍 띠를 또 두르지 않는다 */
+:root[data-design='waybill'] :is(section.card, .local, .dlg) .dt {
+  border-inline: 0;
+  background: var(--wb-headband), var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] section.card .table {
+  border: 1.5px solid var(--wb-ink);
+}
+
+/* 날짜도 입력 칸과 같은 괘선 칸이다. 이름이 칸 안에 박힌다 */
+:root[data-design='waybill'] section.card label.date {
+  flex: none;
+  gap: 0;
+  width: 150px;
+  padding-top: 3px;
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] section.card label.date > span {
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+  color: var(--color-text-3);
+}
+
+:root[data-design='waybill'] section.card label.date input {
+  width: 100%;
+  height: 28px;
+  border: 0;
+  outline: none;
+  background: none;
+}
+
+/* 대리결재자: 낮은 창에서 표가 라벨 밖으로 나가 서랍 밑에 깔리지 않게 라벨째 스크롤한다 */
+:root[data-design='waybill'] .wrap:has(> section.card.grow) {
+  overflow-y: auto;
+}
+
+:root[data-design='waybill'] section.card.grow {
+  flex: 1 0 auto;
+}
+
+:root[data-design='waybill'] section.card > h2 {
+  margin: 0 calc(-1 * var(--sp-3));
+  padding: 5px var(--sp-3);
+  background: var(--wb-ink);
+  color: var(--wb-label);
+  font-family: inherit;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+:root[data-design='waybill'] section.card .hint {
+  color: var(--color-text-2);
+}
+
+/* ── 로그인: 상자 옆면의 스텐실과 그 위에 붙인 빈 운송장 ───────────────── */
+
+/* 상자를 봉한 포장 테이프. 라벨 한가운데를 지나도록 카드 폭에서 잰다 */
+:root[data-design='waybill'] .login::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% + 95px);
+  width: 110px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.28) 10%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.22) 90%, rgba(255, 255, 255, 0.06)),
+    #b7935f;
+  box-shadow: inset 1px 0 0 rgba(26, 26, 26, 0.18), inset -1px 0 0 rgba(26, 26, 26, 0.18);
+}
+
+:root[data-design='waybill'] .login .card {
+  position: relative;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+@media (min-width: 761px) {
+  :root[data-design='waybill'] .login .card {
+    grid-template-columns: 300px 440px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root[data-design='waybill'] .login::before {
+    left: calc(50% - 55px);
+  }
+}
+
+:root[data-design='waybill'] .login .brand {
+  padding: var(--sp-2) var(--sp-6) var(--sp-2) 0;
+  background: none;
+  border: 0;
+}
+
+:root[data-design='waybill'] .login .art {
+  align-items: stretch;
+}
+
+:root[data-design='waybill'] .login .tagline,
+:root[data-design='waybill'] .login .ver {
+  color: var(--wb-ink);
+  font-weight: var(--fw-semibold);
+}
+
+:root[data-design='waybill'] .login .form {
+  gap: 0;
+  padding: 0;
+  border-inline: 16px solid transparent;
+  outline: 2px solid var(--wb-ink);
+  background: var(--wb-feed);
+  box-shadow: 6px 6px 0 rgba(26, 26, 26, 0.75);
+}
+
+:root[data-design='waybill'] .login h1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--wb-ink);
+  color: var(--wb-label);
+  font-family: var(--wb-display);
+  font-size: 32px;
+  font-weight: var(--fw-regular);
+  line-height: 1;
+}
+
+:root[data-design='waybill'] .login fieldset.nets {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-bottom: 2px solid var(--wb-ink);
+}
+
+:root[data-design='waybill'] .login .nets legend {
+  float: left;
+  width: 100%;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  color: var(--color-text-3);
+}
+
+:root[data-design='waybill'] .login .nets legend::before {
+  content: var(--wb-cap-from) / '';
+  margin-right: var(--sp-2);
+  padding: 0 var(--sp-1);
+  background: var(--wb-ink);
+  color: var(--wb-label);
+}
+
+:root[data-design='waybill'] .login .netlist {
+  clear: both;
+  gap: 0;
+}
+
+:root[data-design='waybill'] .login .net {
+  height: 38px;
+  border: 1.5px solid var(--wb-ink);
+  background: var(--color-surface-raised);
+}
+
+:root[data-design='waybill'] .login .net + .net {
+  margin-left: -1.5px;
+}
+
+:root[data-design='waybill'] .login .net.on {
+  border-color: var(--wb-ink);
+  background: var(--color-selected);
+  box-shadow: inset 0 -3px 0 var(--wb-orange);
+}
+
+:root[data-design='waybill'] .login .net .dot {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--wb-ink);
+  border-radius: 0;
+  background: var(--color-surface-raised);
+}
+
+/* 고른 망의 칸은 그 망의 색으로 칠해 로그인 뒤 머리줄 배지와 이어진다 */
+:root[data-design='waybill'] .login .net.on .dot {
+  background: var(--color-net-internet);
+  box-shadow: inset 0 0 0 2px var(--color-selected);
+}
+
+:root[data-design='waybill'] .login .net.on .dot.biz {
+  background: var(--color-net-business);
+}
+
+:root[data-design='waybill'] .login .direction {
+  margin-top: var(--sp-2);
+  color: var(--wb-ink);
+  font-weight: var(--fw-semibold);
+}
+
+:root[data-design='waybill'] .login .form > .field {
+  border-width: 0 0 2px;
+}
+
+:root[data-design='waybill'] .login .form > .field > .label,
+:root[data-design='waybill'] .login .form > .field > .box input,
+:root[data-design='waybill'] .login .form > .field > .box .lead,
+:root[data-design='waybill'] .login .form > .field > .note {
+  padding-inline: var(--sp-3);
+}
+
+:root[data-design='waybill'] .login .form > .field > .box .lead + input {
+  padding-left: 0;
+}
+
+:root[data-design='waybill'] .login .form > .field:has(#loginIdInput) > .label::before {
+  content: var(--wb-cap-owner) / '';
+  margin-right: var(--sp-2);
+  padding: 0 var(--sp-1);
+  background: var(--wb-ink);
+  color: var(--wb-label);
+}
+
+/* 위아래 칸과 맞닿아 있어 띠를 안쪽으로 그린다 */
+:root[data-design='waybill'] .login .form > .field:focus-within {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--wb-orange);
+}
+
+/* 오류 칸: 띠가 칸 이름·입력·안내 글자에 닿지 않게 벌리고, 안쪽 면이 띠를 덮지 않게 비운다 */
+:root[data-design='waybill'] .login .form > .field:has(> .box.invalid) {
+  padding-block: 7px 4px;
+}
+
+:root[data-design='waybill'] .login .form > .field:has(> .box.invalid) > .box {
+  background: none;
+}
+
+:root[data-design='waybill'] .login .form > .cb {
+  padding: var(--sp-2) var(--sp-3);
+}
+
+:root[data-design='waybill'] .login .form > .error {
+  margin: 0 var(--sp-3);
+  border-style: solid;
+  border-width: 1.5px;
+}
+
+:root[data-design='waybill'] .login .form > .btn {
+  width: auto;
+  margin: var(--sp-2) var(--sp-3) var(--sp-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design='waybill'] {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+  :root[data-design='waybill'] [role='progressbar'].indeterminate .fill {
+    animation: none;
+    width: 100%;
+  }
+}
