@@ -128,15 +128,15 @@ Wails 판의 지금 상태(2026-10-30, `README.md`·`client.go` 467줄 확인)
 | LINK-009 | 요청마다 메서드·주소·URL·본문 앞 120자 디버그 로그 | P2 | 하 | 구현. 개선: URL 대신 호스트만 남긴다(사용자 방문 기록 노출 줄임) |
 | LINK-010 | 화면에서 고른 서버가 업무망이 아니거나 `fm_hyperlink_mode` 가 없거나 0 이면 200 | P1 | 하 | 구현 |
 | LINK-011 | `redirectUrl=` 뒤를 소문자·trim, 문자열 자르기로 호스트 추출(`black` 과 그 밖이 다르게 자른다) | P1 | 중 | 구현. 코드는 `lastIndexOf`(보안 D-007 조치)로 명세의 "처음 나오는" 보다 앞서 있다. Go 는 `net/url` 로 호스트를 뽑되 판정 결과가 같은지 시험표로 맞춘다(7.6절) |
-| LINK-012 | 필터 항목이 호스트에 부분 문자열로 들어 있으면 걸림. `black` 이면 안 걸린 것, 그 밖이면 걸린 것이 대상 | P1 | 중 | 구현. 대소문자 처리 불일치는 8절 |
-| LINK-013 | 로그인 완료·트레이 [정책 받아오기] 때 [3094] `GetUrlFilter`(code 0), 항목 `url` 만 | P1 | 하 | 구현 |
+| LINK-012 | 필터 항목이 호스트에 부분 문자열로 들어 있으면 걸림. `black` 이면 안 걸린 것, 그 밖이면 걸린 것이 대상 | P1 | 중 | 구현. Wails 판 white 는 항목과 같거나 그 하위 도메인일 때만 걸린다(8.1절). black 은 원본 그대로 |
+| LINK-013 | 로그인 완료·트레이 [정책 받아오기] 때 [3094] `GetUrlFilter`(code 0), 항목 `url` 만 | P1 | 하 | 구현. Wails 판은 `flag`(SBM 적용 범위)도 판정에 쓴다(8.1절) |
 | LINK-014 | 대상이고 URL 에 호스트가 있으면 [3204] `SendURL`, 응답을 기다리지 않고 205 | P1 | 하 | 구현 |
 | LINK-016 | [3204] 응답 code 4·res≠1 이면 `요청 처리 오류` 창에 `링크 연동에서 악성코드가 발견되었습니다.`, 그 밖 실패는 로그 | P1 | 하 | 구현 |
 | LINK-018 | 로그인 완료 때 `LinkRedirect 정책 location[..] fm_hyperlink_mode[..] ...` 와 가지 로그 | P2 | 하 | 구현. 진단용 |
 | LINK-020 | 확장: 페이지 로드 완료마다 제목·URL 을 POST(`~~docTitle=<제목> redirectUrl=<URL>`) | P1 | 하 | 구현. 확장은 그대로 쓴다(앱 쪽 형식 호환) |
 | LINK-021 | 확장 안내 페이지 `인터넷망 분리 안내` 3초 뒤 닫기, `fm_hyperlink_notice0` 는 로그에만 | P2 | 하 | 부분. 확장 쪽 |
 | LINK-022 | 확장의 `ERR_TUNNEL_CONNECTION_FAILED` 처리기 결함(정의 안 된 `tab`) | P2 | 하 | 부분. 확장을 고칠 때 함께 |
-| LINK-024 | 알림 9004 `MSG_KIND_URL_SEND`(4) 받으면(userid 가 있고 내 ID 와 다르면 버림) `dat` 를 기본 브라우저로 연다. http/https·호스트만 | P1 | 하 | 구현. Wails `application.Get().Browser.OpenURL` 또는 `rundll32 url.dll`. 09 알림과 함께 |
+| LINK-024 | 알림 9004 `MSG_KIND_URL_SEND`(4) 받으면(userid 가 있고 내 ID 와 다르면 버림) `dat` 를 기본 브라우저로 연다. http/https·호스트만 | P1 | 하 | 구현. Wails `application.Get().Browser.OpenURL`. Wails 판은 사이트마다 로그인당 한 번 사용자에게 묻는다(원본은 묻지 않는다, 8.2절). 09 알림과 함께 |
 | LINK-025 | [정책] 화면 유형 `LinkRedirect` 에 URL 필터 목록 한 행씩 | P2 | 하 | 구현. [정책] 화면을 만들 때 |
 
 ### 2.5 명령줄·단일 인스턴스·파이프·오른쪽 메뉴
@@ -254,7 +254,7 @@ Wails `Files()` 응답에서 `NameStr` 에 `__CLIP__` 이 있고 상태 글자�
 ### 3.5 URL 필터 ― `CommonService.GetUrlFilter` [3094]/[3095]
 
 - 요청 `UrlFilterRequest{code: 0}`(0 = filemover).
-- 응답 `UrlFilterResponse{count, list: []UrlFilterInfo{code, flag, name, url}}`. `url` 만 모아 정책의 URL 목록을 **통째로 바꾼다**.
+- 응답 `UrlFilterResponse{count, list: []UrlFilterInfo{code, flag, name, url}}`. 원본은 `url` 만 모아 정책의 URL 목록을 **통째로 바꾼다**. Wails 판은 `flag` 까지 보관한다. 서버는 `flag` 로 거르지 않고 모든 행을 보낸다.
 - 부르는 때: 로그인 완료, 트레이 [정책 받아오기].
 - 로그 원문: 성공 `LinkRedirect UrlFilter 목록 조회[3095] 응답 건수:`, 실패 `LinkRedirect UrlFilter 목록 조회[3094] 실패!!!`.
 
@@ -270,7 +270,9 @@ Wails `Files()` 응답에서 `NameStr` 에 `__CLIP__` 이 있고 상태 글자�
 
 - `NotifyService` 스트림의 `NotifyMessage{notify_svcno: 9004, kind: 4, userid, dat}`.
 - `userid` 가 있고 내 ID 와 다르면 버린다(원본은 대소문자를 가린다, `FileMoverGrpc.cpp:2516,2549`).
-- `dat` 를 URL 로 읽어 http/https 이고 호스트가 있으면 기본 브라우저로 연다. 로그 `업무망에서 전달된 URL 수신:`. 아니면 경고 `업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니다):`.
+- `dat` 를 URL 로 읽어 http/https 이고 호스트가 있으면 로그 `업무망에서 전달된 URL 수신:` 을 남긴다. 아니면 경고 `업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니다)` 로 끝낸다.
+- Wails 판은 그 뒤 OS 질문 창(제목 `링크 열기`, 단추 [열기]·[취소], 기본 단추 [취소])으로 사이트와 주소를 보이고 [열기] 를 누르면 기본 브라우저로 연다. 원본은 묻지 않고 바로 연다(8.2절).
+  허락한 호스트는 로그아웃까지 다시 묻지 않는다. 창이 떠 있는 동안 온 새 호스트의 주소는 묻지 않고 버리며 정보 로그 `업무망에서 전달된 URL 을 열지 않았다(거절했거나 다른 확인 창이 떠 있다)` 를 남긴다.
 - `CommonService.RecvURL` 은 proto 에만 있고 원본은 부르지 않는다(검색: `RecvURL` 호출 0건). Wails 판도 부르지 않는다.
 - 같은 9004 의 kind 0(`MSG_KIND_FILE_LIST`)은 1초 뒤 목록 재조회. 원본은 `break` 가 없어 kind 1(결재) 처리로 이어진다 ― 의도인지 불분명하다(8절).
 
@@ -342,7 +344,7 @@ MOSFM 대조 결과가 나오면 표 하나만 고친다.
 | `self_approve` | 자기 자신을 결재자로 허용 | ― | 결재자 창(06) |
 | `fm_checksum` | `"0"` 이면 검사값 끔 | 켠 것 | 업로드 `checksum` 칸 |
 | `fm_hyperlink_mode` | 0·없음 = 사용 안 함, 그 밖 = 사용(주석상 2 = 일반) | 0 | LINK-010 |
-| `url_check_method` | `white` / `black`. 처리기 판정은 `black` 대소문자 무시, 그 밖은 `white` | white | LINK-011·012 |
+| `url_check_method` | `white` / `black`. 처리기 판정은 `black` 대소문자 무시, 그 밖은 `white`(`white` 의 도메인 일치는 8.1절) | white | LINK-011·012 |
 | `fm_hyperlink_forcepac` | 1 = PAC 강제. 원본은 경고 로그만 | ― | LINK-019(제외) |
 | `fm_hyperlink_pacpath0`·`pacpath1`·`fm_hyperlink_notice0` | 로그에만 | ― | LINK-018·021 |
 | `fm_dlp_*` | `SAMSUNG_CARD` 빌드에서만, 차단은 주석 | ― | CLIP-012(제외) |
@@ -434,10 +436,10 @@ Link Redirect
 18. **`redirectUrl=` 없는 본문**: 원본은 `indexOf` -1 이면 본문 12번째 글자부터를 URL 로 쓴다(보안 C-021). Go 는 없으면 200 으로 끝낸다.
 19. **제목에 `redirectUrl=` 이 든 페이지**: 확장이 제목을 앞에 붙이므로 `lastIndexOf` 로 마지막 것을 쓴다(지금 코드, 보안 D-007 조치). 그래도 URL 자체에 `redirectUrl=` 이 들면 잘린다 ―
     Go 는 `" redirectUrl="`(앞 공백 포함)의 마지막 위치로 자르고, 확장을 고칠 수 있으면 JSON 본문으로 바꾼다(8절).
-20. **부분 문자열 판정**: 필터 `abc.com` 이 `xabc.com.evil.net` 에도 걸린다(보안 D-006). 동작 호환을 위해 기본은 원본과 같게 두고, 8절의 도메인 끝 일치를 정책 결정 후 켠다.
+20. **부분 문자열 판정**: 원본은 필터 `abc.com` 이 `xabc.com.evil.net` 에도 걸린다(보안 D-006). Go 는 white 를 도메인 단위로 판정하고 black 만 부분 문자열로 둔다(8.1절).
 21. **첫 로그인 전 요청**: 원본은 빈 서버 목록을 첨자로 읽어 죽을 수 있다(보안 C-010, 실행 미확인). Go 는 세션이 없으면 200.
 22. **확장이 하위 프레임 완료마다 보냄**: 같은 주소가 여러 번 온다. Go 처리기는 같은 URL 을 2초 안에 다시 받으면 보내지 않는다(8절).
-23. **받은 URL 의 스킴**: 받는 쪽도 http/https 만 연다(보안 C-001 조치가 코드에 있다).
+23. **받은 URL 의 스킴**: 받는 쪽도 http/https 만 연다(보안 C-001 조치가 코드에 있다). Go 는 열기 전에 사용자에게 묻는다(8.2절).
 24. **9001·9004 userid 대소문자**: 원본은 가린다. NBMT 는 ID 를 소문자로 바꿔 보낸다(`docs/NBMT_알림_사용자ID_절단.md`). Go 는 `strings.EqualFold` 로 비교한다(8절).
 
 IPC·단일 인스턴스
@@ -581,12 +583,13 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
   5. 호스트 뽑기(`getHostName`): 원본은 method 가 정확히 `"black"`(대소문자 구분)일 때와 아닐 때 다르게 자른다.
      - black: 스킴 뒤 첫 `:` 앞까지, 맨 앞 `www.` 제거, 스킴 뒤 첫 `/` 앞까지 ― 결과에 스킴이 남는다(`https://abc.com`).
      - 그 밖: `http://`·`https://`·`www.` 를 모두 지우고 첫 `:`·`/` 앞까지(`abc.com`).
-     이 차이 때문에 black 의 부분 문자열 판정이 스킴까지 포함한 문자열을 대상으로 돈다. Go 는 **원본 문자열 자르기를 그대로 옮긴 함수**와 `url.Parse` 기반 함수를 둘 다 만들고,
-     필터 목록 실례(9절)로 두 결과가 같은 판정을 내는지 시험표로 확인한 뒤 `url.Parse` 쪽으로 바꾼다. 확인 전까지는 원본 함수를 쓴다(동작 호환 우선).
+     이 차이 때문에 black 의 부분 문자열 판정이 스킴까지 포함한 문자열을 대상으로 돈다. Go 는 black 은 원본 글자 자르기를 그대로 쓰고, 그 밖은 `url.Parse` 의 `Hostname()` 을 쓴다.
+     `www.` 는 지우지 않는다(`www.abc.com` 은 항목 `abc.com` 의 하위 도메인이다). 파서를 못 지나는 주소는 호스트가 없다. 까닭은 8.1절.
   6. 호스트가 비면 200.
-  7. 대상 판정(`isLinkRedirectTarget`): 필터 항목마다(빈 항목 제외) `strings.Contains(host, item)` 이면 걸림. `strings.EqualFold(method, "black")` 이면 `!걸림` 이 대상, 그 밖이면 `걸림` 이 대상.
-     원본은 이 판정에서 항목·호스트의 대소문자를 가리지 않는다(`host.indexOf(info)` 는 Qt 기본이 대소문자 구분이지만 호스트는 이미 소문자다 ― 필터 항목에 대문자가 있으면 걸리지 않는다, 추정).
-     Go 는 항목도 소문자로 바꿔 비교한다(8절).
+  7. 대상 판정(`isLinkRedirectTarget`): 원본은 필터 항목마다(빈 항목 제외) `host.indexOf(item) >= 0` 이면 걸림이고, 대소문자 무시 `black` 이면 `!걸림` 이 대상, 그 밖이면 `걸림` 이 대상이다.
+     항목은 소문자로 바꾸지 않아 대문자 항목은 호스트에 걸리지 않는다(`filemoverpolicy.cpp:234-258`).
+     Go 는 항목을 소문자로 바꾸고 앞뒤 공백을 지운다. black 은 원본과 같은 부분 문자열이고, 그 밖은 `host == item || strings.HasSuffix(host, "."+item)` 이다.
+     원본은 행의 `flag` 를 보지 않지만 Go 는 미적용 행을 건너뛰고 차단 행은 어느 모드든 뺀다(8.1절).
   8. 대상 아님 → 200.
   9. `url.Parse(webUrl)` 이 http/https 이고 호스트가 있어야 한다. 아니면 경고 `링크연동 주소가 http/https 가 아니라 보내지 않았다:` 뒤 200.
   10. `strings.Contains(webUrl, host)` 이면 [3204] `SendURL` 을 goroutine 으로 보내고 로그 `인터넷망으로 URL전송[%1]`, 205. 아니면 200.
@@ -691,8 +694,7 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
 9. **Link Redirect 본문 상한·로그인 확인·같은 URL 2초 중복 억제**: 64KB 상한, 세션 없으면 200, 하위 프레임 완료로 같은 주소가 여러 번 가는 것을 줄인다.
 10. **포트 독점 열기**(`SO_EXCLUSIVEADDRUSE`): 다른 프로세스가 29000 에 겹쳐 붙어 URL 을 가로채는 것을 막는다(보안 C-040).
 11. **필터 대소문자 통일**: 호스트·필터 항목 모두 소문자로 비교. `url_check_method` 도 대소문자 무시로 통일(원본은 호스트 뽑기에서만 구분한다).
-12. **도메인 끝 일치**(결정 필요): `abc.com` 필터가 `xabc.com.evil.net` 에 걸리지 않게 `host == item || strings.HasSuffix(host, "."+item)`. 관리자가 부분 문자열을 기대하고 등록했을 수 있어
-    서버 필터 실례를 보고 정한다(보안 D-006).
+12. **white 도메인 일치**(결정: 적용): `abc.com` 필터가 `xabc.com.evil.net` 에 걸리지 않게 `host == item || strings.HasSuffix(host, "."+item)` 로 판정한다. black 은 부분 문자열을 유지한다(8.1절, 보안 D-006).
 13. **userid 비교 대소문자 무시**: 9001·9004 에서 `strings.EqualFold`. NBMT 가 소문자로 보내는 ID 와 맞는다.
 14. **9004 kind 0 의 `break` 누락**을 따라 하지 않는다. 결재 목록 갱신이 필요하면 명시적으로 부른다(09 알림과 함께 MOSFM 대조).
 15. **로그에 URL 전체 대신 호스트**: 사용자 방문 기록이 로그에 평문으로 쌓이지 않게(LINK-009). 디버그 수준에서만 전체.
@@ -710,6 +712,66 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
 24. **크기 초과 안내에 숫자**: `전송 가능한 파일 크기 초과` 뒤에 `(상한 1 KB, 현재 13 KB)`(CLIP-010).
 25. **단축키 등록 결과 표시**: 설정 칸 아래에 `등록됨`/`다른 프로그램이 쓰는 단축키입니다`.
 26. **받기 완료 알림**: 클립보드를 덮어쓴 뒤 화면 구석에 `클립보드에 글을 넣었습니다(12 자)` 같은 짧은 알림(CLIP-026 "알리기" 는 결정 기록이 없어 묻는 창은 만들지 않는다).
+
+### 8.1 결정: white 필터를 도메인 단위로 판정한다
+
+부분 문자열 판정에서는 허용 항목 `daum.net` 이 `daum.net.evil.example` 에도 걸려, 공격자가 만든 도메인의 주소가 인터넷망 PC 로 건너간다.
+white 목록은 망을 건너도 되는 곳을 정하는 허용 목록으로 보아 2026-10-18 에 도메인 단위 판정을 정했다(`E:\git\snBv6FM\docs\security\fixes\D-plugins.md` 의 D-006). Wails 판은 이 결정을 따른다.
+
+- white: `url.Parse` 의 호스트가 항목과 같거나 `.항목` 으로 끝날 때만 걸린다.
+- black: 항목이 호스트 문자열 어디에든 들어 있으면 뺀다. 좁히면 차단할 주소가 새어 나가므로 그대로 둔다. 넓게 걸려서 틀리면 주소를 보내지 않는 쪽으로 틀린다.
+- 호스트를 URL 파서로 뽑는다. 글자 자르기에 끝 일치만 더하면 `https://evil.example?.daum.net` 의 호스트가 `evil.example?.daum.net` 이 되어 통과하고, `https://daum.net@evil.example/` 은 `daum.net` 으로 읽힌다.
+- 서버 `make_proxypac.c` 는 `shExpMatch(url, "*값*")` 로 URL 전체를 부분 문자열로 비교한다. 앱 판정은 이 규칙과 일부러 달라진다. 항목 하나로 PAC 와 앱의 판정이 다를 수 있다.
+
+기존 필터가 깨지는지 SBM 등록 규칙(`redirectMng.js:232-257`, `valid.js:99`)과 시험 서버 값으로 확인한 결과는 다음과 같다. 항목은 SBM URL 필터에 등록한 값이고, "원본 white" 는 Qt 판 판정이다.
+
+| 항목 | 원본 white | Wails 판 white | 비고 |
+|---|---|---|---|
+| `daum.net` | `daum.net`, `www.daum.net`, `mail.daum.net` 대상 | 같다 | 칸 제목 "도메인" 대로 등록한 값은 그대로다 |
+| `10.1.2.3` | `10.1.2.3`, `10.1.2.33` 대상 | `10.1.2.3` 만 대상 | `10.1.2.33` 이 빠지는 것이 맞다 |
+| `google.co` | `google.com`, `google.co.kr` 대상 | `google.co` 와 그 하위만 대상 | **깨진다**. 도메인 경계가 아닌 일부만 적은 항목은 정확한 도메인으로 다시 등록해야 한다 |
+| `daum` | `daum.net` 대상 | 걸리지 않는다 | **깨진다**. 다만 SBM 은 점 없는 영문 값을 받지 않아 DB 직접 입력일 때만 생긴다 |
+| `www.daum.net` | 호스트에서 `www.` 를 지워 걸리지 않는다 | `www.daum.net` 과 그 하위 대상 | 넓어진다. 관리자가 적은 뜻대로다 |
+| `https://daum.net`, `daum.net/news`, `daum.net:8080` | 걸리지 않는다(SBM 은 받는다) | 걸리지 않는다 | 같다. 넓히지 않으려고 정규화하지 않는다 |
+
+행의 적용 범위도 판정에 쓴다. SBM 링크리다이렉트 설정 화면(`redirectMng.jsp`)에서 미적용·프록시 허용·차단으로 고르는 칸은 `fm_url_filter.allow_flag` 에 저장되고, 서버 `GetUrlFilter` 는 이 값으로 거르지 않은 채 모든 행을 준다. `make_proxypac.c` 는 `allow_flag = 1` 행만 PAC 에 넣는다.
+원본처럼 값을 무시하면 관리자가 미적용·차단으로 둔 주소도 white 에서 망을 건넌다.
+
+| 적용 범위(`allow_flag`) | white | black | PAC 와의 관계 |
+|---|---|---|---|
+| 미적용(0) | 판정에 쓰지 않는다 | 판정에 쓰지 않는다 | 같다. 등록 때 값을 비우면 0 이다 |
+| 프록시 허용(1) | 도메인이 일치하면 보낸다 | 부분 문자열이 일치하면 뺀다 | 같다(일치 방식은 위 white 설명대로 다르다) |
+| 차단(2) | 부분 문자열이 일치하면 뺀다 | 부분 문자열이 일치하면 뺀다 | 다르다. `make_proxypac.c` 는 2 행을 넣지 않는다 |
+
+- 차단 행은 허용 행보다 앞선다. `daum.net` 이 허용이고 `bad.daum.net` 이 차단이면 `bad.daum.net` 은 보내지 않는다. 행 순서와 무관하다.
+- 모르는 값은 차단처럼 다룬다. 어느 모드에서도 주소를 보내지 않는 쪽이다.
+- 동작이 넓어지는 경우가 하나 있다. black 에서 미적용 행의 주소는 원본에서는 빠졌지만 이제 전송 대상이다. PAC 도 그 주소를 앱으로 보내므로, 관리자가 규칙을 끈 뜻과 PAC 에 맞췄다.
+- SBM 안내 문구의 "차단: pac포함(명시적 차단 0.0.0.0:0)" 은 저장소의 `make_proxypac.c` 에 구현돼 있지 않다. 앱은 이 문구의 뜻대로 보내지 않는다.
+- [정책] 화면의 LinkRedirect 행은 적용 범위와 상관없이 서버가 준 행을 모두 보인다.
+
+실례 표본은 작다. 시험 서버 .157 의 `fm_url_filter` 는 0행(`url_check_method=white`, `fm_hyperlink_mode=0`)이고, DB 초기 자료에 `sqisoft.com` 1건이 있다(`ssdb/mariadb_init/smex_int.sql:1290`). 192.168.107.121·192.168.101.233 은 접속 시간 초과로 보지 못했다.
+고객사 필터 값은 본 적이 없다. 표의 "깨진다" 는 SBM 규칙에서 유도한 것이며, 그런 값이 실제로 등록돼 있는지는 모른다.
+
+### 8.2 결정: 받는 쪽에서 사용자에게 묻고 연다
+
+MOSFM·Qt 판·포팅 전 Wails 판 셋 다 받은 주소를 묻지 않고 연다(`E:\git\MOSFM\source\FileMover\ViewControllerNotifySlot.cpp:1284-1290`, `E:\git\snBv6FM\src\ViewControllerNotifySlot.cpp:1061-1069`). 원본 대조로는 확인 창이 없는 것이 맞다.
+그래도 Wails 판은 확인 창을 넣는다.
+
+- 보내는 쪽 판정을 넘는 경로가 있다. black 모드에서는 공격 페이지가 `location` 으로 이동해도 확장이 대신 보낸다. 앱 창구는 Origin 없는 로컬 프로그램의 POST 를 받는다. 서버 `SendURL` 은 스킴·필터를 검사하지 않는다(`svc_sendurl.go`).
+  서버 알림 UDP 수신기는 인증이 없어 개발 PC 패킷이 수신기까지 닿았다(`E:\git\snBv6FM\docs\security\20_서버요청문-SR024-027-검증.md` 2-5~2-8절. 위조 전문이 앱까지 닿는지는 확인하지 못했다).
+- 업무망이 인터넷에 못 나가도, 주소가 망을 건너 인터넷 PC 에서 GET 되면 URL 에 담긴 자료가 공격자 서버로 나간다. 이 경로에서 업무망 공격자가 제어할 수 없는 판정은 받는 PC 의 사람뿐이다.
+- 보안 조사 C-001 의 대응에 확인 창이 있고 남은 일로 기록돼 있다(`E:\git\snBv6FM\docs\security\fixes\C-app-core.md`).
+
+주소가 자동으로 열리는 것이 이 기능의 목적이다(레거시 스펙 016 SC-001). 매번 물으면 쓸 수 없으므로 범위를 좁혔다.
+
+- 사이트(호스트)당 로그인 동안 한 번 묻는다. 기본 단추는 [취소]다.
+- 창은 한 번에 하나만 띄운다. 창이 떠 있는 동안 온 새 호스트의 주소는 버리고 로그만 남겨, 주소를 밀어 넣어 창을 쌓는 일을 막는다.
+- 답을 기다리는 사이 로그아웃하면 [열기] 를 눌러도 열지 않고 기억하지도 않는다. 로그아웃하면 허락을 잊는다.
+- OS 질문 창을 쓴다. 창이 하나도 없는 앱에서도 맨 앞에 뜨고 프런트엔드 디자인을 건드리지 않는다.
+  Windows 에서 [열기]·[취소] 단추는 `build/windows/wails.exe.manifest`(공용 컨트롤 6)가 실행 파일에 들어 있어야 나온다. Taskfile 빌드는 넣는다. 매니페스트 없이 `go build` 만 한 실행 파일은 예(Y)·아니요(N) 창이 되고 기본 단추가 예(Y)로 바뀌며 Esc 도 먹지 않는다. 예 = 열기, 아니요 = 취소로 뜻은 같다.
+
+한계: 허락한 호스트로 가는 주소는 묻지 않으므로 그 호스트로의 유출은 막지 못한다. 받는 쪽에서 필터를 다시 판정하는 안은 인터넷망 쪽 필터·정책 값이 유효한지 확인하지 못해 채택하지 않았다.
+Qt 판에는 이 두 결정이 들어가지 않았다. 같은 필터에서 Qt 판과 Wails 판의 전송 대상이 다를 수 있고, 받는 쪽 확인 창은 Wails 판에만 뜬다.
 
 ---
 
@@ -730,7 +792,7 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
 | 크기 | `fm_clip_size`=1(KB) ― 인증시험 0039 와 같다 |
 | 권한 없음 | 업무망 업로드 칸 0 |
 | 사전 결재 | 클립보드 사전승인 `fm_aprv_clup`=1(SBM DB 이름, code 행 필요), `fm_upfile_mode`=0 |
-| Link Redirect | `fm_hyperlink_mode`=2, `url_check_method`=white, SBM URL 필터에 시험 호스트 1건 |
+| Link Redirect | `fm_hyperlink_mode`=2, `url_check_method`=white, SBM URL 필터에 시험 호스트 1건(적용 범위 프록시 허용) |
 | 도메인 정책 | 업무망 `fmenv.ini [CONFIG] DOMAIN_POLICY=1`, SBM 도메인 정책 1건(시험용 이름·사설 IP). 시험 PC 에서 관리자 권한으로 실행 |
 
 검증 항목과 통과 기준
@@ -740,7 +802,8 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
    - 묶음 앞머리·이름 검사(원본 `tst_ClipFmh` 40건의 입력표).
    - `clipPrepareSendHtml`·`clipCleanReceivedHtml` 입력표(원본 ClipRefs 시험).
    - 권한 판정표 4칸(4.1절), 크기 경계(상한과 같으면 막힘).
-   - Link Redirect 호스트 뽑기·대상 판정(white/black × 걸림/안 걸림 × 대소문자), `redirectUrl=` 없음·두 번.
+   - Link Redirect 호스트 뽑기·대상 판정(white/black × 걸림/안 걸림 × 대소문자), 적용 범위(white/black × 미적용·프록시 허용·차단), 유사 도메인·사용자 정보·쿼리·조각에 숨긴 도메인, `redirectUrl=` 없음·두 번.
+   - 받은 주소 확인(`TestGate`): 거절·허락 기억·창이 떠 있을 때 새 호스트 버림·로그아웃 뒤 다시 질문.
    - hosts `removeBlocks`·`appendBlock`(원본 `tst_DomainPolicy` 입력, CRLF·LF·줄바꿈 없음·끝 표식 없음).
 2. **글 왕복**: 업무망 Wails 판에서 메모장 글 복사 → [클립보드 업로드] → 인터넷망 Qt 판에서 `클립보드 N 건` 이 1 늘고 [클립보드 다운로드] → 메모장에 같은 글. 반대 방향(Qt 업로드 → Wails 받기)도.
    서버 목록에서 그 건이 사라진다([3036]). 한글·이모지·CRLF 포함 글로.
@@ -753,6 +816,7 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
 8. **단축키**: 설정에서 `항상사용`, 복사 `ALT+SHIFT`+`C`. 메모장 글을 선택하고 단축키 → 업로드 성공. 상대망에서 붙여넣기 단축키 → 메모장 커서 자리에 글이 들어간다. 다른 프로그램이 같은 키를 쓰면 설정 칸에 실패가 보인다.
 9. **Link Redirect**: Chrome 에 `imports\ssbridgeExtension` 을 압축 해제 확장으로 올리고(개발자 모드), 업무망 로그인 상태에서 필터 호스트 페이지를 연다 →
    인터넷망 PC(같은 사용자 계정으로 로그인한 Wails 또는 Qt 판)의 기본 브라우저에 같은 주소가 열린다. 앱 로그 `인터넷망으로 URL전송[` 과 상대 로그 `업무망에서 전달된 URL 수신:`.
+   받는 쪽이 Wails 판이면 먼저 `링크 열기` 창이 뜬다. 트레이로 숨긴 상태에서도 맨 앞에 뜨고, [취소]·Esc 면 열리지 않으며, [열기] 뒤 같은 사이트의 다른 주소는 묻지 않고 열리고, 로그아웃 뒤 다시 로그인하면 또 묻는다.
    확장 탭이 안내 페이지로 바뀌는지도 본다 ― **바뀌지 않으면 no-cors 불투명 응답(status 0) 추정이 맞는 것**이고 Qt 판도 같은지 대조한다.
    `curl -s -o NUL -w "%{http_code}" -d "~~docTitle=t redirectUrl=https://<필터호스트>/" http://127.0.0.1:29000/` → 205, 필터 밖 → 200, `/x` → 404.
 10. **포트 충돌**: 29000 을 먼저 다른 프로세스(`python -m http.server 29000 --bind 127.0.0.1`)로 잡고 Wails 판을 띄운다 → 앱은 뜨고 로그에 실패 문구.

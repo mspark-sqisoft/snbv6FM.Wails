@@ -22,6 +22,7 @@ import (
 	"snbapp/internal/link"
 	"snbapp/internal/nbs"
 	"snbapp/internal/notify"
+	"snbapp/pb/commonservice"
 	pbn "snbapp/pb/notify"
 )
 
@@ -29,6 +30,7 @@ const (
 	argBatch     = 400 * time.Millisecond // 탐색기가 여러 파일을 프로세스 하나씩 띄운다 ― 이만큼 묶는다
 	uploadRetry  = 75                     // 앞 업로드가 답을 기다리면 argBatch 간격으로(약 30초)
 	urlDedup     = 2 * time.Second
+	urlShown     = 300 // 확인 창에 보이는 주소 글자 수
 	msgLinkFatal = "링크연동을 사용할 수 없습니다 - 나머지 기능은 정상 동작합니다."
 )
 
@@ -46,9 +48,10 @@ type LinkService struct {
 	base
 	server *link.Server
 	dedup  link.Dedup
+	gate   link.Gate // 받은 주소를 열기 전 확인
 
 	mu     sync.Mutex
-	filter []string // URL 필터 [3094]
+	filter []*commonservice.UrlFilterInfo // URL 필터 [3094]
 
 	argMu sync.Mutex
 	batch argJob      // 묶는 중
@@ -75,6 +78,7 @@ func newLinkService(c *Core) *LinkService {
 		l.mu.Lock()
 		l.filter = nil
 		l.mu.Unlock()
+		l.gate.Reset()
 	})
 	return l
 }
@@ -168,7 +172,8 @@ func (l *LinkService) sendURL(s *nbs.Session, web string) {
 	}
 }
 
-// onURL 은 업무망에서 온 URL(알림 9004 kind 4)을 기본 브라우저로 연다.
+// onURL 은 업무망에서 온 URL(알림 9004 kind 4)을 사용자에게 물은 뒤 기본 브라우저로 연다.
+// 원본은 묻지 않고 연다. 주소는 이 PC 밖에서 정해지고 서버도 거르지 않으므로 여기가 사람이 보는 마지막 자리다(docs/port/07 8.2절).
 func (l *LinkService) onURL(m *pbn.NotifyMessage) {
 	web := strings.TrimSpace(m.Dat)
 	if !link.IsWebURL(web) {
@@ -176,19 +181,41 @@ func (l *LinkService) onURL(m *pbn.NotifyMessage) {
 		return
 	}
 	u, _ := url.Parse(web)
-	l.log().Info("업무망에서 전달된 URL 수신:", "host", u.Hostname())
+	host := strings.ToLower(u.Hostname())
+	l.log().Info("업무망에서 전달된 URL 수신:", "host", host)
 	app := application.Get()
 	if app == nil {
 		return
 	}
-	go func() {
+	gen := l.c.Gen()
+	go func() { // 답을 기다리는 동안 알림 처리를 막지 않는다
+		// 답을 기다리는 사이 로그아웃했으면 열지도 기억하지도 않는다
+		if !l.gate.Open(host, func() bool { return askOpen(app, host, web) && l.c.IsCurrent(gen) }) {
+			l.log().Info("업무망에서 전달된 URL 을 열지 않았다(거절했거나 다른 확인 창이 떠 있다)", "host", host)
+			return
+		}
 		if err := app.Browser.OpenURL(web); err != nil {
 			l.log().Warn("브라우저를 열지 못했다", "err", err)
 		}
 	}()
 }
 
-func (l *LinkService) urlFilter() []string {
+// askOpen 은 OS 질문 창으로 주소를 열지 묻는다. 창이 없는 앱에서도 맨 앞에 뜨고, 답할 때까지 돌아오지 않는다. 기본 단추는 [취소]다.
+func askOpen(app *application.App, host, web string) bool {
+	if r := []rune(web); len(r) > urlShown {
+		web = string(r[:urlShown]) + "…"
+	}
+	ok := false
+	d := app.Dialog.Question().SetTitle("링크 열기").SetMessage(fmt.Sprintf(
+		"업무망에서 보낸 주소를 브라우저로 여시겠습니까?\n\n사이트: %s\n주소: %s\n\n[열기]를 누르면 로그아웃할 때까지 이 사이트는 다시 묻지 않습니다.", host, web))
+	d.AddButton("열기").OnClick(func() { ok = true })
+	cancel := d.AddButton("취소")
+	d.SetDefaultButton(cancel).SetCancelButton(cancel)
+	d.Show()
+	return ok
+}
+
+func (l *LinkService) urlFilter() []*commonservice.UrlFilterInfo {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.filter
@@ -221,8 +248,8 @@ func (c *Core) LinkPolicyRows() []PolicyRow {
 	}
 	list := links.urlFilter()
 	rows := make([]PolicyRow, 0, len(list))
-	for _, u := range list {
-		rows = append(rows, PolicyRow{Type: "LinkRedirect", Name: u})
+	for _, f := range list {
+		rows = append(rows, PolicyRow{Type: "LinkRedirect", Name: f.Url})
 	}
 	return rows
 }

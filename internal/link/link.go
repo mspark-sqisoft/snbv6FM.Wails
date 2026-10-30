@@ -27,6 +27,12 @@ const Port = 29000
 
 const bodyLimit = 64 << 10
 
+// fm_url_filter.allow_flag 값. 2 는 SBM 의 차단이다.
+const (
+	flagOff   = 0 // 미적용
+	flagProxy = 1 // 프록시 허용
+)
+
 // extensionSchemes 는 브라우저 확장이 보내는 Origin 의 스킴이다. 확장 ID 는 고정되어 있지 않아(manifest.json 에 key 가 없다) 스킴까지만 본다.
 var extensionSchemes = []string{"chrome-extension", "moz-extension", "safari-web-extension"}
 
@@ -114,10 +120,10 @@ func (s *Server) Close() {
 
 // Rule 은 판정에 쓰는 정책 값이다.
 type Rule struct {
-	Business bool     // 업무망 세션
-	Mode     string   // fm_hyperlink_mode
-	Method   string   // url_check_method
-	Filter   []string // URL 필터
+	Business bool                           // 업무망 세션
+	Mode     string                         // fm_hyperlink_mode
+	Method   string                         // url_check_method
+	Filter   []*commonservice.UrlFilterInfo // URL 필터
 }
 
 // redirectURL 은 본문에서 확장이 끝에 붙인 실제 주소다. 페이지 제목에 든 값을 피하려고 마지막 것을 쓴다.
@@ -133,8 +139,9 @@ func redirectURL(body string) (string, bool) {
 	return strings.TrimSpace(body[i+len(key):]), true
 }
 
-// HostName 은 소문자 주소에서 판정할 호스트를 원본과 같은 글자 자르기로 뽑는다.
-// method 가 정확히 "black" 이면 스킴이 남고(https://abc.com), 그 밖이면 스킴·www. 를 모두 지운다(abc.com).
+// HostName 은 소문자 주소에서 판정할 호스트를 뽑는다. 파서를 못 지나면 "".
+// method 가 정확히 "black" 이면 원본과 같은 글자 자르기라 스킴이 남고(https://abc.com), 그 밖이면 URL 파서의 호스트다(www.abc.com) ―
+// 글자 자르기는 https://evil.example?.abc.com·https://abc.com@evil.example 의 호스트를 잘못 읽는다.
 func HostName(webURL, method string) string {
 	if method == "black" {
 		s := webURL
@@ -155,33 +162,36 @@ func HostName(webURL, method string) string {
 		}
 		return s
 	}
-	s := strings.NewReplacer("http://", "", "https://", "", "www.", "").Replace(webURL)
-	if i := strings.Index(s, ":"); i >= 0 {
-		s = s[:i]
+	u, err := url.Parse(webURL)
+	if err != nil {
+		return ""
 	}
-	if i := strings.Index(s, "/"); i >= 0 {
-		s = s[:i]
-	}
-	return s
+	return u.Hostname()
 }
 
-// IsTarget 은 호스트가 전송 대상인가다. white 는 목록에 걸린 것만, black 은 걸리지 않은 것만 보낸다(서버가 proxy.pac 을 만드는 규칙과 같다).
-// 호스트는 이미 소문자라 필터 항목도 소문자로 맞춘다. 빈 항목은 모든 호스트에 걸리므로 건너뛴다.
-func IsTarget(host, method string, filter []string) bool {
+// IsTarget 은 호스트가 전송 대상인가다. white 는 목록의 도메인과 그 하위 도메인만 보낸다 ― 목록은 망을 건너는 허용 목록이라 daum.net 이
+// daum.net.evil.example 에 걸리면 안 된다(보안 D-006, 서버 proxy.pac 의 부분 문자열 규칙과 일부러 다르다). black 은 항목이 호스트 어디에든
+// 있으면 빼는 proxy.pac 규칙 그대로다 ― 넓게 걸려도 보내지 않는 쪽으로 틀린다. 호스트는 이미 소문자라 항목도 소문자로 맞추고, 빈 항목은 건너뛴다.
+// flag(SBM 의 allow_flag): 미적용 행은 판정에 쓰지 않고, 프록시 허용 행만 white 목록이 되며, 그 밖의 행은 어느 모드든 black 처럼 뺀다.
+func IsTarget(host, method string, filter []*commonservice.UrlFilterInfo) bool {
 	if host == "" {
 		return false
 	}
-	hit := false
+	black := strings.EqualFold(method, "black")
+	target := black
 	for _, f := range filter {
-		if f = strings.ToLower(f); f != "" && strings.Contains(host, f) {
-			hit = true
-			break
+		item := strings.ToLower(strings.TrimSpace(f.Url))
+		if item == "" || f.Flag == flagOff {
+			continue
+		}
+		if (black || f.Flag != flagProxy) && strings.Contains(host, item) {
+			return false
+		}
+		if f.Flag == flagProxy && (host == item || strings.HasSuffix(host, "."+item)) {
+			target = true
 		}
 	}
-	if strings.EqualFold(method, "black") {
-		return !hit
-	}
-	return hit
+	return target
 }
 
 // IsWebURL 은 http/https 이고 호스트가 있는 주소인가다. 보내는 쪽·받는 쪽이 같은 판정을 쓴다(file://·UNC·등록된 프로토콜을 열지 않는다).
@@ -239,19 +249,58 @@ func (d *Dedup) First(url string, now time.Time, window time.Duration) bool {
 	return true
 }
 
-// FetchFilter 는 [3094] URL 필터를 받아 url 칸만 돌려준다.
-func FetchFilter(s *nbs.Session) ([]string, error) {
+// Gate 는 상대망에서 온 주소를 열기 전에 사용자에게 묻는 자리다. 허락한 호스트는 Reset 까지 다시 묻지 않는다.
+// ponytail: 창은 하나만 띄우고 그동안 온 새 호스트는 버린다(밀려드는 주소에 창이 쌓이지 않게) ― 대기열이 필요하면 여기서 늘린다.
+type Gate struct {
+	mu     sync.Mutex
+	hosts  map[string]bool
+	asking bool
+}
+
+// Open 은 host 를 열어도 되는가다. 허락한 호스트면 묻지 않고, 아니면 ask 가 답할 때까지 기다린다.
+func (g *Gate) Open(host string, ask func() bool) bool {
+	g.mu.Lock()
+	if g.hosts[host] {
+		g.mu.Unlock()
+		return true
+	}
+	if g.asking {
+		g.mu.Unlock()
+		return false
+	}
+	g.asking = true
+	g.mu.Unlock()
+
+	ok := ask()
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.asking = false
+	if ok {
+		if g.hosts == nil {
+			g.hosts = map[string]bool{}
+		}
+		g.hosts[host] = true
+	}
+	return ok
+}
+
+// Reset 은 허락을 모두 잊는다(로그아웃).
+func (g *Gate) Reset() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.hosts = nil
+}
+
+// FetchFilter 는 [3094] URL 필터를 받는다. 서버는 적용 범위와 상관없이 모든 행을 준다.
+func FetchFilter(s *nbs.Session) ([]*commonservice.UrlFilterInfo, error) {
 	ctx, cancel := s.Ctx(nbs.RPCTimeout)
 	defer cancel()
 	res, err := s.Common().GetUrlFilter(ctx, &commonservice.UrlFilterRequest{Code: 0})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]string, 0, len(res.List))
-	for _, f := range res.List {
-		out = append(out, f.Url)
-	}
-	return out, nil
+	return res.List, nil
 }
 
 // ErrMalware 는 [3204] 가 악성코드로 거절했을 때다.
