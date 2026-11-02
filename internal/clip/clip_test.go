@@ -251,6 +251,7 @@ func TestFileURLPathByOS(t *testing.T) {
 	}{
 		{"file:///C:/a/../b.png", true, "C:/b.png", true},
 		{"file:///tmp/a.png", true, "", false},
+		{"file://evil@/C:/x.png", true, "", false},
 		{"file:////evil/s/../../C:/x.png", true, "", false},
 		{"file:///%5C%5Cevil%5Cs/../../C:/x.png", true, "", false},
 		{"file:///tmp/a/../b.png", false, "/tmp/b.png", true},
@@ -450,6 +451,84 @@ func TestAllowClip(t *testing.T) {
 }
 
 // ── 묶음 왕복·CF_HTML·그림 ──
+
+// 정리하면 묶음 항목처럼 보이는 바깥 주소와, url( 글자가 없는 CSS 참조는 CSS 에 남지 않는다.
+func TestReceiveCleansDisguisedCSS(t *testing.T) {
+	for _, v := range []string{
+		`url('http://evil.example/../../` + kRoot + kBundled + `')`,
+		`url(a/..//evil/s/../../` + kRoot + kBundled + `)`,
+		`url(file://evil@/` + kRoot + kBundled + `)`,
+		`\75rl(http://evil.example/a.png)`,
+		`u\72 l(http://evil.example/a.png)`,
+		`\000055RL(http://evil.example/a.png)`,
+		`image-set("http://evil.example/a.png" 1x)`,
+		`-webkit-image-set('http://evil.example/a.png' 1x)`,
+		`\69mage-set("http://evil.example/a.png" 1x)`,
+		"\\75\r\nrl(http://evil.example/a.png)",
+		"\\69\r\nmage-set(\"http://evil.example/a.png\" 1x)",
+	} {
+		for _, html := range []string{`<div style="background:` + strings.ReplaceAll(v, `"`, "&quot;") + `">t</div>`, `<style>p{background:` + v + `}</style>`} {
+			out := cleanReceived(html)
+			if out.Refs == 0 || strings.Contains(out.HTML, "url(http") || strings.Contains(out.HTML, "image-set(") || strings.Contains(out.HTML, `rl(http`) {
+				t.Errorf("%s: %+v", html, out)
+			}
+		}
+	}
+	for _, css := range []string{`@\69mport "http://evil.example/a.css";`, `@import/**/"http://evil.example/a.css";`, "@\\69\r\nmport \"http://evil.example/a.css\";"} {
+		if out := cleanReceived(`<style>` + css + `p{color:red}</style>`); out.Refs != 1 || strings.Contains(out.HTML, "evil") {
+			t.Errorf("%s: %+v", css, out)
+		}
+	}
+	// CSS 가 문자열·url 을 저절로 닫는 입력 끝, 주석·문자열에 숨긴 앞머리
+	for _, html := range []string{
+		`<style>@import "http://evil.example/a.css</style>`,
+		`<style>@import url(http://evil.example/a.css</style>`,
+		`<style>p{background:url(http://evil.example/a.png</style>`,
+		`<style>p{background:url("` + kRoot + kBundled + `x</style>`,
+		`<div style="background:url(http://evil.example/a.png">t</div>`,
+		`<style>p{/*url(data:image/png,*/background:url(http://evil.example/a.png)}</style>`,
+		`<div style="x:'url(data:image/png,';background:URL(http://evil.example/a.png)">t</div>`,
+		"<style>p{background:url(\"data:image/png,x\n);background:url(http://evil.example/a.png);q:\")}</style>",
+		`<style>p{/*url(` + kRoot + `a*/background:url(http://evil.example/../../../` + kBundled + `)}</style>`,
+		// 지운 자리가 이스케이프를 끝내거나 새 이름을 만드는 입력
+		`<style>p{background:\75@import "x";rl(http://evil.example/a.png)}</style>`,
+		`<style>p{background:\75@import/**/"x";rl(http://evil.example/a.png)}</style>`,
+		`<style>\40import@import "";"http://evil.example/a.css";</style>`,
+		`<style>@import@import "";"http://evil.example/a.css";</style>`,
+		`<style>` + strings.Repeat(`@\69`, 20) + `@import "";` + strings.Repeat(`mport "";`, 19) + `mport "http://evil.example/a.css";</style>`,
+	} {
+		if out := cleanReceived(html); out.Refs == 0 || strings.Contains(out.HTML, "evil") {
+			t.Errorf("%s: %+v", html, out)
+		}
+	}
+	for _, html := range []string{
+		`<style>p{background:ima\67@import "";e-set("http://evil.example/a.png" 1x)}</style>`,
+		`<p style="background:ima\67@import 'x';e-set('http://evil.example/a.png' 1x)">t</p>`,
+	} {
+		if out := cleanReceived(html); !strings.Contains(out.HTML, "x-removed(") {
+			t.Errorf("%s: %+v", html, out)
+		}
+	}
+	// 지운 @import 의 앞뒤가 붙어 새 참조나 닫는 태그가 되지 않는다
+	for _, css := range []string{`@im@import "x";port "http://evil.example/a.css";`, `p{background:\75r@import"x";l(http://evil.example/a.png)}`, `</st@import "";yle><img src=http://evil.example/a.png>`} {
+		if out := cleanReceived(`<style>` + css + `</style>`); strings.Contains(out.HTML, `@import`) || strings.Contains(out.HTML, `\75rl(`) || strings.Contains(out.HTML, `</style><img`) {
+			t.Errorf("%s: %+v", css, out)
+		}
+	}
+	// 묶음 항목과 Word 의 글꼴 이름은 그대로 둔다
+	for _, html := range []string{
+		`<div style="background:url(` + kRoot + kBundled + `)">t</div>`,
+		`<style>p{font-family:"\B9D1\C740 \ACE0\B515 (본문)"}</style>`,
+	} {
+		if out := cleanReceived(html); out.HTML != html || out.Refs != 0 {
+			t.Errorf("%s: %+v", html, out)
+		}
+	}
+	// 같은 CSS 에서 다른 것을 지워도 글꼴 이름의 이스케이프는 남는다
+	if out := cleanReceived(`<style>p{font-family:"\B9D1\C740";background:url(http://evil.example/a.png)}</style>`); out.Refs != 1 || !strings.Contains(out.HTML, `\B9D1\C740`) {
+		t.Errorf("%+v", out)
+	}
+}
 
 func TestBundleRoundTrip(t *testing.T) {
 	dir := t.TempDir()

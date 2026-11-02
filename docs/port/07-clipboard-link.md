@@ -270,7 +270,7 @@ Wails `Files()` 응답에서 `NameStr` 에 `__CLIP__` 이 있고 상태 글자�
 
 - `NotifyService` 스트림의 `NotifyMessage{notify_svcno: 9004, kind: 4, userid, dat}`.
 - `userid` 가 있고 내 ID 와 다르면 버린다(원본은 대소문자를 가린다, `FileMoverGrpc.cpp:2516,2549`).
-- `dat` 를 URL 로 읽어 http/https 이고 호스트가 있으면 로그 `업무망에서 전달된 URL 수신:` 을 남긴다. 아니면 경고 `업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니다)` 로 끝낸다.
+- `dat` 를 URL 로 읽어 http/https 이고 호스트가 있으면 로그 `업무망에서 전달된 URL 수신:` 을 남긴다. 아니면 경고 `업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니거나 호스트를 받지 않는다)` 로 끝낸다. Wails 판의 호스트는 ASCII 이름이나 IP 만 받는다(8.2절).
 - Wails 판은 그 뒤 OS 질문 창(제목 `링크 열기`, 단추 [열기]·[취소], 기본 단추 [취소])으로 사이트와 주소를 보이고 [열기] 를 누르면 기본 브라우저로 연다. 원본은 묻지 않고 바로 연다(8.2절).
   허락한 호스트는 로그아웃까지 다시 묻지 않는다. 창이 떠 있는 동안 온 새 호스트의 주소는 묻지 않고 버리며 정보 로그 `업무망에서 전달된 URL 을 열지 않았다(거절했거나 다른 확인 창이 떠 있다)` 를 남긴다.
 - `CommonService.RecvURL` 은 proto 에만 있고 원본은 부르지 않는다(검색: `RecvURL` 호출 0건). Wails 판도 부르지 않는다.
@@ -543,7 +543,7 @@ Wails v3 `Clipboard` 는 글만 다룬다(`pkg/application/clipboard.go` 의 `Se
 - 경로(`fmhEntryPath`): `filepath.Clean(root + "/" + name)` 이 `root + 분리자` 로 시작해야 한다. Go 1.24 이상이면 `os.Root`(`os.OpenRoot(clipDir)` → `root.Create(name)`)로 폴더 밖 쓰기를 OS 수준에서 막는다 ― 이 모듈은 Go 1.26.
 - 받는 쪽 풀기(`ReturnFiles`): 0번 HTML 의 `MOSFM_CLIP_FOLDER` 를 클립 폴더 경로로, `rewriteFmhHtmlImageSrcs` 로 다른 OS 의 절대 경로·`file://` 를 이 PC 경로로, `clipCleanReceivedHtml` 로 정리
   (script 요소·`base`·`meta refresh`·on* 속성 제거, a/area href 는 `javascript:`·`vbscript:`·그림 아닌 `data:` 만 제거, srcset·srcdoc 제거, 참조 속성 src background poster data href xlink:href o:href lowsrc dynsrc 는
-  data:image 이거나 묶음 항목을 가리킬 때만 남김, CSS url()·@import 정리). 지운 것이 있으면 로그 `클립보드 HTML 받기 >>> 바깥 참조 %1건, 스크립트 %2건 지움`.
+  data:image 이거나 묶음 항목을 가리킬 때만 남김, CSS url()·@import 정리. Wails 판은 이스케이프로 쓴 `\75rl(`·`@\69mport` 도 풀어서 보고, 문자열을 주소로 읽는 `image-set(` 은 함수째 무효로 만든다. 입력 끝에서 닫히지 않은 문자열·url, 주석에 숨긴 `url(` 이 뒤의 참조까지 삼킨 값도 지운다. `@import` 를 지운 자리가 새 참조를 만들지 않게 풀기와 지우기를 바뀌지 않을 때까지 되풀이한다. 태그를 훑는 쪽이 HTML 파서와 다르게 읽는 입력(`</stylex>`, svg·math 안의 style·title 류, 끝 태그의 속성, `--!>` 주석, svg CDATA, noembed 류, svg 표현 속성의 url(), 지운 태그 자리에서 붙는 `<<base>img`)은 아직 막지 않았다. 묶음 항목 판정은 경로를 정리하기 전과 뒤를 모두 본다 ― `http://evil/../../C:/…` 처럼 정리하면 폴더 안으로 보이는 값을 남기지 않는다). 지운 것이 있으면 로그 `클립보드 HTML 받기 >>> 바깥 참조 %1건, 스크립트 %2건 지움`.
   그림 항목은 이름이 그림 확장자가 아니고 내용에 `html`·`script`·`body`·`src=`·`head` 가 있으면 버린다(`IsNotImage`).
 - 보내는 쪽 묶기(`CombineFiles`): 0번 `dst.htm`, 1번부터 그림. 결과 크기를 돌려주고 0 이면 실패(Wails 판은 멈춘다).
 
@@ -591,7 +591,7 @@ for _, addr := range []string{"127.0.0.1:29000", "[::1]:29000"} {
      Go 는 항목을 소문자로 바꾸고 앞뒤 공백을 지운다. black 은 원본과 같은 부분 문자열이고, 그 밖은 `host == item || strings.HasSuffix(host, "."+item)` 이다.
      원본은 행의 `flag` 를 보지 않지만 Go 는 미적용 행을 건너뛰고 차단 행은 어느 모드든 뺀다(8.1절).
   8. 대상 아님 → 200.
-  9. `url.Parse(webUrl)` 이 http/https 이고 호스트가 있어야 한다. 아니면 경고 `링크연동 주소가 http/https 가 아니라 보내지 않았다:` 뒤 200.
+  9. `url.Parse(webUrl)` 이 http/https 이고 호스트가 있어야 한다. 아니면 경고 `링크연동 주소가 http/https 가 아니거나 호스트를 받지 않아 보내지 않았다:` 뒤 200(Wails 판의 호스트 조건은 8.2절).
   10. `strings.Contains(webUrl, host)` 이면 [3204] `SendURL` 을 goroutine 으로 보내고 로그 `인터넷망으로 URL전송[%1]`, 205. 아니면 200.
 - 로그 원문: 시작 성공 `LinkRedirect httpServer Listening port[29000] IPv4[127.0.0.1] IPv6[::1]`, 실패 `LinkRedirect httpServer listen failed port[29000] - 다른 프로그램이 port를 사용중인지 확인하세요.`,
   한쪽 `- 한쪽만 열렸습니다.`, 앱 쪽 `링크연동을 사용할 수 없습니다 - 나머지 기능은 정상 동작합니다.`, 요청 `LinkRedirect httpServer 요청 수신:`, 404 `LinkRedirect httpServer 처리되지 않은 요청(404):`.
@@ -767,6 +767,7 @@ MOSFM·Qt 판·포팅 전 Wails 판 셋 다 받은 주소를 묻지 않고 연�
 - 사이트(호스트)당 로그인 동안 한 번 묻는다. 기본 단추는 [취소]다.
 - 창은 한 번에 하나만 띄운다. 창이 떠 있는 동안 온 새 호스트의 주소는 버리고 로그만 남겨, 주소를 밀어 넣어 창을 쌓는 일을 막는다.
 - 답을 기다리는 사이 로그아웃하면 [열기] 를 눌러도 열지 않고 기억하지도 않는다. 로그아웃하면 허락을 잊는다.
+- 사용자에게 보인 호스트와 브라우저가 여는 호스트가 달라지면 안 되므로, 호스트는 ASCII 이름(영문·숫자·`.`·`_`·`-`)이나 IP 만 받는다. `url.Parse` 는 호스트의 `"` 를 받는데 브라우저에 넘어가는 인자에서 `\"` 가 되어 앞쪽 호스트로 열리고, Go 의 소문자 변환은 `İ` 를 `i` 로 줄이는데 브라우저는 다른 도메인(`xn--…`)으로 읽는다. 끝 라벨이 숫자인 이름(`010.1.2.3`·`0x7f.1`·`192.168.1`)도 거절한다. 브라우저는 이것을 IPv4 로 풀어 표기와 다른 주소를 연다. 한글 도메인은 브라우저가 `xn--` 로 바꾼 주소를 보내므로 그대로 쓸 수 있다. 판정은 보내는 쪽 `Decide` 와 받는 쪽 `onURL` 이 같은 `IsWebURL` 을 쓴다.
 - OS 질문 창을 쓴다. 창이 하나도 없는 앱에서도 맨 앞에 뜨고 프런트엔드 디자인을 건드리지 않는다.
   Windows 에서 [열기]·[취소] 단추는 `build/windows/wails.exe.manifest`(공용 컨트롤 6)가 실행 파일에 들어 있어야 나온다. Taskfile 빌드는 넣는다. 매니페스트 없이 `go build` 만 한 실행 파일은 예(Y)·아니요(N) 창이 되고 기본 단추가 예(Y)로 바뀌며 Esc 도 먹지 않는다. 예 = 열기, 아니요 = 취소로 뜻은 같다.
 

@@ -73,12 +73,12 @@ func TestAutoPending(t *testing.T) {
 	if pending() != 0 {
 		t.Fatal("진행 중인 파일을 또 올린다")
 	}
-	ts.settleAuto(req, false)
+	ts.settleAuto(req, false, ts.login)
 	if pending() != 1 {
 		t.Fatal("실패한 파일은 다시 올린다")
 	}
 	ts.markAuto(req)
-	ts.settleAuto(req, true)
+	ts.settleAuto(req, true, ts.login)
 	if pending() != 0 {
 		t.Fatal("결과를 모르는 같은 내용을 또 올린다")
 	}
@@ -88,11 +88,11 @@ func TestAutoPending(t *testing.T) {
 	}
 	// 완료 응답을 기다리는 동안 바뀐 내용은 보낸 내용이 아니다
 	ts.markAuto(req)
-	ts.settleAuto(req, true)
+	ts.settleAuto(req, true, ts.login)
 	if pending() != 1 {
 		t.Fatal("기다리는 동안 바뀐 내용을 막았다")
 	}
-	ts.settleAuto(UploadRequest{Path: p}, true)
+	ts.settleAuto(UploadRequest{Path: p}, true, ts.login)
 	if len(ts.autoSent) != 0 {
 		t.Fatal("사람의 업로드에 표시를 남겼다")
 	}
@@ -114,7 +114,7 @@ func TestAutoPendingFolder(t *testing.T) {
 	}
 	ts := newTestTransfers(context.Background())
 	ts.autoPaths, ts.autoSent = map[string]bool{}, map[string]UploadRequest{}
-	ts.settleAuto(UploadRequest{Path: dir, Auto: true, baseline: base}, true)
+	ts.settleAuto(UploadRequest{Path: dir, Auto: true, baseline: base}, true, ts.login)
 	if got := ts.autoPending([]string{dir}); len(got) != 0 {
 		t.Fatal("같은 내용을 또 올린다", got)
 	}
@@ -126,13 +126,20 @@ func TestAutoPendingFolder(t *testing.T) {
 	}
 }
 
+// commitLost 는 끝 신호를 받고 gate 가 닫히면(nil 이면 곧바로) 답 없이 끊는 서버다.
 type commitLost struct {
 	serverfile.UnimplementedServerFileServiceServer
+	got  chan struct{}
+	gate chan struct{}
 }
 
-func (commitLost) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploadRequest, common.AnswerResponse]) error {
+func (c commitLost) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploadRequest, common.AnswerResponse]) error {
 	for {
 		if _, err := st.Recv(); err == io.EOF {
+			if c.gate != nil {
+				close(c.got)
+				<-c.gate
+			}
 			return status.Error(codes.Unavailable, "끊김")
 		} else if err != nil {
 			return err
@@ -140,11 +147,12 @@ func (commitLost) FileUpload(st grpc.BidiStreamingServer[serverfile.FileUploadRe
 	}
 }
 
-// 서버의 답 없이 끊긴 자동 업로드는 전송 결과가 표시까지 이어져 다음 주기 후보에서 빠진다.
-func TestEnqueueCommitUnknown(t *testing.T) {
+// startAutoUpload 는 가짜 서버로 자동 업로드 하나를 넣고 경로와 끝남 알림을 돌려준다.
+func startAutoUpload(t *testing.T, ts *Transfers, srvImpl commitLost) (string, chan error) {
+	t.Helper()
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer()
-	serverfile.RegisterServerFileServiceServer(srv, commitLost{})
+	serverfile.RegisterServerFileServiceServer(srv, srvImpl)
 	go srv.Serve(lis)
 	t.Cleanup(srv.Stop)
 	conn, err := grpc.NewClient("passthrough:///fake",
@@ -162,7 +170,6 @@ func TestEnqueueCommitUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := newTestTransfers(context.Background())
 	ts.m = transfer.NewManager(5, 100<<20, transfer.Hooks{})
 	ts.autoPaths, ts.autoSent = map[string]bool{}, map[string]UploadRequest{}
 	done := make(chan error, 1)
@@ -170,13 +177,71 @@ func TestEnqueueCommitUnknown(t *testing.T) {
 		OnDone: func(e error) { done <- e }}); err != nil {
 		t.Fatal(err)
 	}
+	return p, done
+}
+
+func waitDone(t *testing.T, done chan error) {
+	t.Helper()
 	select {
 	case <-done:
 	case <-time.After(20 * time.Second):
 		t.Fatal("끝나지 않았다")
 	}
+}
+
+// 서버의 답 없이 끊긴 자동 업로드는 전송 결과가 표시까지 이어져 다음 주기 후보에서 빠진다.
+func TestEnqueueCommitUnknown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ts := newTestTransfers(ctx)
+	p, done := startAutoUpload(t, ts, commitLost{})
+	waitDone(t, done)
+	c := filepath.Clean(p)
+	ts.mu.Lock()
+	busy := ts.autoPaths[c]
+	_, sent := ts.autoSent[c]
+	ts.mu.Unlock()
+	if busy || !sent {
+		t.Fatal("끝난 전송의 표시가 맞지 않다", busy, sent)
+	}
 	if got := ts.autoPending([]string{p}); len(got) != 0 {
 		t.Fatal("완료 응답을 못 받은 같은 내용을 다음 주기에 또 올린다", got)
+	}
+}
+
+// 앞 로그인의 전송이 다음 로그인 뒤에 끝나도 다음 로그인의 표시를 바꾸지 않는다.
+func TestLateDoneKeepsNextLogin(t *testing.T) {
+	ts := newTestTransfers(context.Background())
+	srv := commitLost{got: make(chan struct{}), gate: make(chan struct{})}
+	p, done := startAutoUpload(t, ts, srv)
+	select {
+	case <-srv.got:
+	case <-time.After(20 * time.Second):
+		t.Fatal("끝 신호가 오지 않았다")
+	}
+	next, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := filepath.Clean(p)
+	ts.mu.Lock()
+	ts.login, ts.autoPaths, ts.autoSent = next, map[string]bool{c: true}, map[string]UploadRequest{}
+	ts.mu.Unlock()
+	close(srv.gate)
+	waitDone(t, done)
+	stale := UploadRequest{Path: p, Auto: true}
+	if ts.settleAuto(stale, true, context.Background()) {
+		t.Fatal("앞 로그인의 결과를 기록했다고 답했다")
+	}
+	ts.mu.Lock()
+	if !ts.autoPaths[c] || len(ts.autoSent) != 0 {
+		ts.mu.Unlock()
+		t.Fatal("앞 로그인의 결과가 다음 로그인의 표시를 바꿨다", ts.autoPaths, ts.autoSent)
+	}
+	ts.mu.Unlock()
+	if ts.settleAuto(UploadRequest{Path: p}, true, next) {
+		t.Fatal("자동 업로드가 아닌 것을 기록했다고 답했다")
+	}
+	if !ts.settleAuto(stale, true, next) {
+		t.Fatal("지금 로그인의 결과를 기록하지 않았다")
 	}
 }
 
@@ -199,7 +264,7 @@ func TestOnLoginResetsAutoSent(t *testing.T) {
 		t.Fatal(err)
 	}
 	ts.onLogin(s)
-	ts.settleAuto(UploadRequest{Path: p, Auto: true, stamp: stamp}, true)
+	ts.settleAuto(UploadRequest{Path: p, Auto: true, stamp: stamp}, true, ts.login)
 	if got := ts.autoPending([]string{p}); len(got) != 0 {
 		t.Fatal("첫 로그인 뒤 표시가 남지 않았다", got)
 	}

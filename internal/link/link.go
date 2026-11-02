@@ -11,7 +11,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -26,6 +28,11 @@ import (
 const Port = 29000
 
 const bodyLimit = 64 << 10
+
+var (
+	webHostRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+	numTailRe = regexp.MustCompile(`(?i)(?:^|\.)(?:[0-9]+|0x[0-9a-f]*)\.?$`)
+)
 
 // fm_url_filter.allow_flag 값. 2 는 SBM 의 차단이다.
 const (
@@ -195,13 +202,23 @@ func IsTarget(host, method string, filter []*commonservice.UrlFilterInfo) bool {
 }
 
 // IsWebURL 은 http/https 이고 호스트가 있는 주소인가다. 보내는 쪽·받는 쪽이 같은 판정을 쓴다(file://·UNC·등록된 프로토콜을 열지 않는다).
+// 호스트는 ASCII 이름이나 IP 만 받는다 ― url.Parse 는 호스트의 " 를 받는데 브라우저로 넘길 때 \" 가 되어 다른 호스트로 열리고, ToLower 는 İ 를 i 로
+// 줄이는데 브라우저는 다른 도메인으로 읽는다. 끝 라벨이 숫자인 이름도 거절한다 ― 브라우저는 010.1.2.3·0x7f.1·192.168.1 을 IPv4 로 풀어 표기와 다른 주소를 연다.
+// 브라우저가 한글 도메인을 xn-- 로 바꿔 주므로 확장이 보내는 주소는 걸리지 않는다.
 func IsWebURL(s string) bool {
 	u, err := url.Parse(s)
 	if err != nil {
 		return false
 	}
 	scheme := strings.ToLower(u.Scheme)
-	return (scheme == "http" || scheme == "https") && u.Hostname() != ""
+	return (scheme == "http" || scheme == "https") && webHost(u.Hostname())
+}
+
+func webHost(h string) bool {
+	if a, err := netip.ParseAddr(h); err == nil {
+		return a.Zone() == ""
+	}
+	return webHostRe.MatchString(h) && !numTailRe.MatchString(h)
 }
 
 // Decide 는 확장 요청 본문을 판정해 반대 망으로 보낼 주소를 돌려준다. 보낼 것이 없으면 "".
@@ -221,7 +238,7 @@ func Decide(body string, r Rule, warn func(string)) string {
 	}
 	if !IsWebURL(raw) {
 		if warn != nil {
-			warn("링크연동 주소가 http/https 가 아니라 보내지 않았다") // 방문 주소는 로그에 남기지 않는다
+			warn("링크연동 주소가 http/https 가 아니거나 호스트를 받지 않아 보내지 않았다") // 방문 주소는 로그에 남기지 않는다
 		}
 		return ""
 	}

@@ -267,8 +267,10 @@ func TestSendCommitUnknown(t *testing.T) {
 	if CodeOf(err) != CodeUpBizSize || errors.Is(err, ErrCommitUnknown) {
 		t.Fatal("거절", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	// 시한이 아니라 취소로 끝낸다 ― 시한은 서버에도 전해져 서버가 먼저 끊으면 이쪽 ctx 가 아직 살아 있어 취소로 판정되지 않는다
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	time.AfterFunc(100*time.Millisecond, cancel)
 	err = send(ctx, &fakeServer{holdCommit: true})
 	if !errors.Is(err, ErrCanceled) || !errors.Is(err, ErrCommitUnknown) {
 		t.Fatal("취소", err)

@@ -138,12 +138,49 @@ func TestDecide(t *testing.T) {
 		{"모드 0", "~~docTitle=t redirectUrl=https://daum.net/", mod(func(r *Rule) { r.Mode = "0" }), ""},
 		{"대상 아님", "~~docTitle=t redirectUrl=https://naver.com/", rule, ""},
 		{"웹 주소 아님", "~~docTitle=t redirectUrl=file://daum.net/x", rule, ""},
+		{"호스트의 따옴표", `~~docTitle=t redirectUrl=https://evil.example"x.daum.net/`, rule, ""},
+		{"소문자로 줄어드는 글자", "~~docTitle=t redirectUrl=https://dİum.daum.net/", rule, ""},
+		{"대문자 호스트는 그대로 보낸다", "~~docTitle=t redirectUrl=https://daum.neT/Path", rule, "https://daum.neT/Path"},
 		{"black 대상", "~~docTitle=t redirectUrl=https://naver.com/", mod(func(r *Rule) { r.Method = "black" }), "https://naver.com/"},
 		{"black 걸림", "~~docTitle=t redirectUrl=https://daum.net/", mod(func(r *Rule) { r.Method = "black" }), ""},
+		{"black 숫자 호스트", "~~docTitle=t redirectUrl=http://012.1.2.3/", mod(func(r *Rule) { r.Method = "black" }), ""},
 	}
 	for _, c := range cases {
 		if got := Decide(c.body, c.rule, nil); got != c.want {
 			t.Errorf("%s: %q, 기대 %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestIsWebURL(t *testing.T) {
+	for s, want := range map[string]bool{
+		"https://daum.net/a":               true,
+		"http://my_host-1.intra:8080/":     true,
+		"http://10.0.0.1/":                 true,
+		"http://[2001:db8::1]:8080/":       true,
+		"https://xn--github-qyd.com/":      true,
+		"http://1e3/":                      true,
+		`https://daum.net/a"b`:             true,
+		"http://010.1.2.3/":                false,
+		"http://192.168.1/":                false,
+		"http://0x7f.1/":                   false,
+		"http://0x7f/":                     false,
+		"http://1.0X7F/":                   false,
+		"http://a.0x/":                     false,
+		"http://0xg/":                      true,
+		"http://2130706433/":               false,
+		"http://10.0.0.1./":                false,
+		`https://evil.example"x.daum.net/`: false,
+		"https://gİthub.com/":              false,
+		"https://한글.kr/":                   false,
+		"https://ex%C4%B0mple.com/":        false,
+		"http://[fe80::1%25en0]/":          false,
+		"http:///a":                        false,
+		"file:///C:/a":                     false,
+		"javascript:alert(1)":              false,
+	} {
+		if got := IsWebURL(s); got != want {
+			t.Errorf("%s: %v", s, got)
 		}
 	}
 }

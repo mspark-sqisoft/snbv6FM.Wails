@@ -81,11 +81,15 @@ var (
 	}
 	dataImageRe = regexp.MustCompile(`(?i)^data:image/(png|jpeg|jpg|gif|bmp|webp|tiff)[;,]`)
 	schemeRe    = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*):`)
-	importRe    = regexp.MustCompile(`(?i)@import\s*(?:url\(\s*(?:"[^"]*"|'[^']*'|[^)]*)\s*\)|"[^"]*"|'[^']*')[^;]*;?`)
-	cssURLRe    = regexp.MustCompile(`(?i)url\(\s*("[^"]*"|'[^']*'|[^)]*?)\s*\)`)
-	refWSRe     = regexp.MustCompile(`[\t\n\r]`)
-	controlsRe  = regexp.MustCompile(`[\x00-\x20]`)
-	driveURLRe  = regexp.MustCompile(`^/[A-Za-z]:[/\\]`)
+	// CSS 는 입력이 끝나면 문자열·url 을 저절로 닫으므로 \z 도 닫힘으로 본다
+	importRe   = regexp.MustCompile(`(?is)@import(?:\s|/\*.*?\*/)*(?:url\(\s*(?:"[^"]*(?:"|\z)|'[^']*(?:'|\z)|[^)]*)\s*(?:\)|\z)|"[^"]*(?:"|\z)|'[^']*(?:'|\z))[^;]*;?`)
+	cssURLRe   = regexp.MustCompile(`(?i)url\(\s*("[^"]*(?:"|\z)|'[^']*(?:'|\z)|[^)]*?)\s*(?:\)|\z)`)
+	imageSetRe = regexp.MustCompile(`(?i)(?:-webkit-)?image-set\(`)
+	cssNameRe  = regexp.MustCompile(`@?(?:[-\w]|\\[0-9a-fA-F]{1,6}(?:\r\n|[ \t\r\n\f])?|\\[^\r\n\f0-9a-fA-F])+`)
+	cssEscRe   = regexp.MustCompile(`\\(?:[0-9a-fA-F]{1,6}(?:\r\n|[ \t\r\n\f])?|[^\r\n\f0-9a-fA-F])`)
+	refWSRe    = regexp.MustCompile(`[\t\n\r]`)
+	controlsRe = regexp.MustCompile(`[\x00-\x20]`)
+	driveURLRe = regexp.MustCompile(`^/[A-Za-z]:[/\\]`)
 )
 
 // DecodeEntities 는 HTML 문자 참조를 푼다. 붙여 넣는 프로그램은 &#92;&#92;host 를 \\host 로 읽으므로 판정은 푼 값으로 한다.
@@ -245,7 +249,7 @@ func refValue(raw string) string {
 // 드라이브를 지우고, file:////host/s/../../C:/x 에는 드라이브를 만든다. 뒤의 값은 정리한 경로로는 안전해도 CSS 에 원문이 남아 UNC 로 읽힌다.
 func fileURLPath(v string, windows bool) (string, bool) {
 	u, err := url.Parse(v)
-	if err != nil || u.Host != "" {
+	if err != nil || u.Host != "" || u.User != nil { // file://host@/C:/x 는 url 에는 호스트가 없어도 읽는 프로그램에는 호스트다
 		return "", false
 	}
 	clean := path.Clean(u.Path)
@@ -498,17 +502,61 @@ func applyEdits(s string, edits []edit) string {
 	return b.String()
 }
 
-// cleanCSS 는 CSS 안의 @import 문장과 keep 이 받지 않는 url(…) 을 지운다. 지운 수도 돌려준다.
+const cssPasses = 8
+
+// cssNames 는 이스케이프로 쓴 url·image-set·@import 를 풀어 정규식이 보게 한다 ― \75rl( 은 url( 과 같다. Word 가 쓰는 글꼴 이름(\B9D1\C740)은 건드리지 않는다.
+func cssNames(css string) string {
+	if !strings.Contains(css, `\`) {
+		return css
+	}
+	return cssNameRe.ReplaceAllStringFunc(css, func(s string) string {
+		if !strings.Contains(s, `\`) {
+			return s
+		}
+		name := cssEscRe.ReplaceAllStringFunc(s, func(e string) string {
+			if h, err := strconv.ParseUint(strings.TrimSpace(e[1:]), 16, 32); err == nil {
+				return string(rune(h))
+			}
+			return e[1:]
+		})
+		switch strings.ToLower(name) {
+		case "url", "image-set", "-webkit-image-set", "@import":
+			return name
+		}
+		return s
+	})
+}
+
+// cleanCSS 는 CSS 안의 @import 문장과 keep 이 받지 않는 url(…) 을 지우고, 따옴표 문자열을 주소로 읽는 image-set(…) 은 함수 이름을 바꿔 무효로 만든다.
+// 지운 수도 돌려준다. 지운 @import 자리는 공백으로 둔다 ― 빈 글자면 앞뒤가 붙어 닫는 태그가 될 수 있다(</st@import "";yle>).
+// 공백은 앞의 이스케이프를 끝내 새 이름을 만들 수 있으므로(\75@import "x";rl() 풀기와 지우기는 바뀌지 않을 때까지 돈다. cssPasses 를 넘기면 내용을 다 지운다.
+// ponytail: 문자열을 주소로 읽는 함수는 image-set 만 본다. CSS 토큰 분석기는 두지 않아 주석·문자열을 가리지 못한다 ― 그런 함수가 늘면 이름을 더한다.
+// image-set 은 안의 값을 보지 않아 data:image 만 든 것도 함께 무효가 되고, 값 안에 url( 이 있으면 svg 의 data:image 도 지워진다. 둘 다 그림이 빠질 뿐 바깥으로 나가지 않는다.
 func cleanCSS(css string, keep func(string) bool) (string, int) {
-	removed := len(importRe.FindAllStringIndex(css, -1))
-	out := importRe.ReplaceAllLiteralString(css, "")
+	removed := 0
+	out := css
+	for i := 0; ; i++ {
+		named := cssNames(out)
+		removed += len(importRe.FindAllStringIndex(named, -1))
+		next := importRe.ReplaceAllLiteralString(named, " ")
+		if next == out {
+			break
+		}
+		if i == cssPasses {
+			return "", removed + 1
+		}
+		out = next
+	}
+	removed += len(imageSetRe.FindAllStringIndex(out, -1))
+	out = imageSetRe.ReplaceAllLiteralString(out, "x-removed(")
 	var edits []edit
 	for _, m := range cssURLRe.FindAllStringSubmatchIndex(out, -1) {
 		v := out[m[2]:m[3]]
 		if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') {
-			v = v[1 : len(v)-1]
+			v = strings.TrimSuffix(v[1:], v[:1])
 		}
-		if keep(v) {
+		// 주석·문자열 안의 url( 은 값이 뒤의 진짜 url( 까지 삼킨다 ― 값의 앞머리만 보면 data:image 로 통과한다
+		if !strings.Contains(asciiLower(v), "url(") && keep(v) {
 			continue
 		}
 		edits = append(edits, edit{m[0], m[1], "url()"})
@@ -519,12 +567,7 @@ func cleanCSS(css string, keep func(string) bool) (string, int) {
 
 // cleanStyleAttr 는 style 속성(문자 참조를 푼 값으로 CSS 를 읽는다)을 고쳐야 하면 그 편집을 더하고 지운 수를 돌려준다.
 func cleanStyleAttr(a attr, keep func(string) bool, edits *[]edit) int {
-	v := DecodeEntities(a.raw)
-	low := asciiLower(v)
-	if !strings.Contains(low, "url(") && !strings.Contains(low, "@import") {
-		return 0
-	}
-	clean, n := cleanCSS(v, keep)
+	clean, n := cleanCSS(DecodeEntities(a.raw), keep)
 	if n == 0 {
 		return 0
 	}
@@ -618,8 +661,9 @@ func bundleName(raw, clipRoot string, names []string) (string, bool) {
 		}
 		v = p
 	}
+	// 정리하기 전에도 폴더 안이어야 한다 ― path.Clean 은 http://evil/../../C:/x 의 앞을 지운다
 	clean := path.Clean(v)
-	if !inFolder(clean, clipRoot) {
+	if !inFolder(v, clipRoot) || !inFolder(clean, clipRoot) {
 		return "", false
 	}
 	name := clean[len(path.Clean(clipRoot))+1:]

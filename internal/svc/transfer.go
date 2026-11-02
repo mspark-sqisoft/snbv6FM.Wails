@@ -761,10 +761,10 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 		}
 		return err
 	}
+	var login context.Context
 	done := func(res transfer.Result) {
 		cleanup()
-		t.settleAuto(r, unknown)
-		if unknown && r.Auto {
+		if t.settleAuto(r, unknown, login) && unknown {
 			log.Warn(fmt.Sprintf("[Auto]완료 응답을 받지 못해 같은 내용은 이 로그인 동안 다시 올리지 않는다 - %s", r.Path))
 		}
 		switch {
@@ -801,7 +801,7 @@ func (t *Transfers) enqueueUpload(s *nbs.Session, r UploadRequest) (int64, error
 	if !strings.Contains(serverName, clipMarker) {
 		key = fmt.Sprintf("up|%s|%d|%d", strings.ToLower(filepath.Clean(r.Path)), st.Size(), st.ModTime().UnixMilli())
 	}
-	t.markAuto(r)
+	login = t.markAuto(r)
 	id, err := t.m.Add(transfer.Job{Dir: transfer.Up, Name: name, Size: r.size, Key: key, Auto: r.Auto,
 		Prepare: prepare, Run: run, Done: done})
 	if err != nil {
@@ -852,14 +852,17 @@ func (r UploadRequest) unchanged() bool {
 	return err == nil && now == r.stamp
 }
 
-func (t *Transfers) markAuto(r UploadRequest) {
-	if r.Auto {
-		t.mu.Lock()
-		if t.autoPaths != nil {
-			t.autoPaths[filepath.Clean(r.Path)] = true
-		}
-		t.mu.Unlock()
+// markAuto 는 자동 업로드를 진행 중으로 표시하고 표시한 로그인을 돌려준다.
+func (t *Transfers) markAuto(r UploadRequest) context.Context {
+	if !r.Auto {
+		return nil
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.autoPaths != nil {
+		t.autoPaths[filepath.Clean(r.Path)] = true
+	}
+	return t.login
 }
 
 func (t *Transfers) unmarkAuto(r UploadRequest) {
@@ -872,17 +875,22 @@ func (t *Transfers) unmarkAuto(r UploadRequest) {
 
 // settleAuto 는 끝난 자동 업로드의 표시를 지운다. 완료 응답을 못 받았으면(unknown) 서버에 올라갔을 수 있어 요청을 남긴다 ―
 // 검사 때 내용 그대로면 다시 올리지 않고, 내용이 바뀌면 새로 올린다. 다시 로그인하면 풀린다: 실제로 실패한 파일을 살리는 길이 이것뿐이다.
-func (t *Transfers) settleAuto(r UploadRequest, unknown bool) {
+// login 은 markAuto 가 돌려준 값이다 ― 로그아웃은 전송이 끝나기를 기다리지 않으므로 앞 로그인의 늦은 결과는 다음 로그인의 표시를 바꾸지 않고 거짓을 돌려준다.
+func (t *Transfers) settleAuto(r UploadRequest, unknown bool, login context.Context) bool {
 	if !r.Auto {
-		return
+		return false
 	}
 	c := filepath.Clean(r.Path)
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.login != login {
+		return false
+	}
 	if unknown && t.autoSent != nil {
 		t.autoSent[c] = r
 	}
 	delete(t.autoPaths, c)
+	return true
 }
 
 // autoPending 은 자동 업로드 후보에서 이번에 올릴 것만 남긴다: 대기·진행 중인 것과, 완료 응답을 못 받은 내용 그대로인 것을 뺀다.

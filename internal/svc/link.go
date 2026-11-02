@@ -177,7 +177,7 @@ func (l *LinkService) sendURL(s *nbs.Session, web string) {
 func (l *LinkService) onURL(m *pbn.NotifyMessage) {
 	web := strings.TrimSpace(m.Dat)
 	if !link.IsWebURL(web) {
-		l.log().Warn("업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니다)")
+		l.log().Warn("업무망에서 전달된 URL 을 열지 않았다(http/https 주소가 아니거나 호스트를 받지 않는다)")
 		return
 	}
 	u, _ := url.Parse(web)
